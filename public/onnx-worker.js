@@ -9,7 +9,7 @@ self.onmessage = async ({ data }) => {
   try {
     if (type === 'loadModel') {
       // 1) create the session
-      ortSession = await ort.InferenceSession.create(modelPath)
+      ortSession = await ort.InferenceSession.create(modelPath, {executionProviders: ['wasm']})
 
       // 2) tell the main thread we’re ready
       self.postMessage({ type: 'loadModel', status: 'success' })
