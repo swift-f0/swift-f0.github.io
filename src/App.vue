@@ -124,12 +124,6 @@ const recordButtonText = computed(() => {
   return 'Record Audio';
 });
 
-// --- NEW: Formatted elapsed time computed property ---
-const formattedElapsedTime = computed(() => {
-  const minutes = Math.floor(elapsedLoadTime.value / 60);
-  const seconds = elapsedLoadTime.value % 60;
-  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-});
 // -----------------------------------------------------
 
 /* ---------- chart configuration ---------- */
@@ -717,7 +711,7 @@ watch([frequencyRange, threshold], () => {
               Loading AI Model...
             </template>
             <template v-else>
-              Still loading, almost there... {{ formattedElapsedTime }} seconds
+              Still loading, almost there... {{ elapsedLoadTime }} seconds
             </template>
           </span>
         </div>
