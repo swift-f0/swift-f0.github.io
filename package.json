@@ -16,12 +16,9 @@
     "@vueform/slider": "^2.1.10",
     "chart.js": "^4.5.0",
     "chartjs-plugin-annotation": "^3.1.0",
-    "nouislider": "^15.8.1",
     "vite-plugin-static-copy": "^3.1.1",
     "vue": "^3.5.17",
-    "vue-chartjs": "^5.3.2",
-    "vue-nouislider": "^1.0.1",
-    "vuetify": "^3.9.1"
+    "vue-chartjs": "^5.3.2"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.11",
