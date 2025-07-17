@@ -619,8 +619,7 @@ watch([frequencyRange, threshold], () => {
           SwiftF0
         </h1>
         <p class="text-white/80 text-sm sm:text-base leading-relaxed mb-4">
-          Analyze and visualize pitch data from audio recordings or uploaded files.
-          Adjust parameters for confidence and frequency range to fine-tune the detection process.
+        Analyze pitch from audio or files. Adjust frequency range to improve accuracy: typical human voices fall between <strong>80–300 Hz</strong>. For instruments, middle C is <strong>261.6 Hz</strong>, low guitar E is <strong>82.4 Hz</strong>. Confidence threshold ranges from 0–100%; around <strong>90%</strong> works best in clean recordings. Narrowing the frequency range and tuning confidence can reduce noise and improve detection.
         </p>
 
         <div class="flex flex-wrap gap-3 text-sm">
