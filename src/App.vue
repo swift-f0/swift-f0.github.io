@@ -20,7 +20,9 @@ ChartJS.register(LinearScale, PointElement, LineElement, Tooltip, Filler)
 const isRecording = ref(false)
 const isProcessing = ref(false)
 const isLoadingModel = ref(true) // New reactive state for model loading
+
 const error = ref<string | null>(null)
+const errorLocation = ref<string | null>(null) // New: To specify where the error occurred
 
 /* Extended type with real timestamps */
 const frameData = ref<{
@@ -31,7 +33,7 @@ const frameData = ref<{
 
 // Reactive variables for metadata
 const processedAudioLength = ref<number | null>(null)
-const processedFileSizeBytes = ref<number | null>(null) // Still kept as a variable, but no longer exported to JSON
+const processedFileSizeBytes = ref<number | null>(null)
 const processedFileName = ref<string | null>(null)
 
 let onnxService: ONNXService | null = null
@@ -211,8 +213,47 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
   }
 }))
 
-/* ---------- improved error handling ---------- */
-function getDetailedError(err: any): string {
+/* ---------- centralized error reporting ---------- */
+function reportError(message: string, location: string, err: any = null) {
+  error.value = message;
+  errorLocation.value = location;
+  // console.error for internal debugging
+  if (err) {
+    console.error(`Error at ${location}:`, err);
+  } else {
+    console.error(`Error at ${location}: ${message}`);
+  }
+  // Clear data related to the failed operation
+  frameData.value = null;
+  processedAudioLength.value = null;
+  processedFileSizeBytes.value = null;
+  processedFileName.value = null;
+}
+
+/* ---------- improved error message generation ---------- */
+function getDetailedErrorMessage(err: any): string {
+  if (err instanceof DOMException) {
+    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+      return 'Microphone access denied. Please grant microphone permissions and try again. Check your browser settings.';
+    }
+    if (err.name === 'NotFoundError') {
+      return 'No microphone found. Please ensure a microphone is connected and enabled.';
+    }
+    if (err.name === 'AbortError') {
+      return 'Microphone access was aborted. This might happen if the device is already in use.';
+    }
+    if (err.name === 'OverconstrainedError') {
+      return 'Microphone constraints could not be satisfied. Your microphone might not support the requested sample rate (16kHz).';
+    }
+    // For MediaRecorder specific DOMExceptions
+    if (err.name === 'InvalidStateError') {
+      return 'Recording state error. The recorder might be in an unexpected state. Try refreshing.';
+    }
+    if (err.name === 'SecurityError') {
+      return 'Security error related to microphone access. Ensure you are on a secure context (HTTPS).';
+    }
+  }
+
   if (err instanceof Error) {
     const message = err.message.toLowerCase()
 
@@ -222,16 +263,16 @@ function getDetailedError(err: any): string {
       return `Audio file is too large or too long. Please try a shorter file (max ${maxAudioDurationMinutes.value} minutes) or reduce file size (max ${maxFileSizeMB.value}MB).`
     }
 
-    if (message.includes('decode') || message.includes('invalid')) {
-      return 'Invalid audio format. Please upload a valid audio file (MP3, WAV, M4A, etc.).'
+    if (message.includes('decode') || message.includes('invalid') || message.includes('bad audio data')) {
+      return 'Invalid audio format or corrupt file. Please upload a valid audio file (MP3, WAV, M4A, etc.).'
     }
 
-    if (message.includes('network') || message.includes('fetch')) {
+    if (message.includes('network') || message.includes('fetch') || message.includes('failed to load')) {
       return 'Network error. Please check your internet connection and try again.'
     }
 
-    if (message.includes('permission') || message.includes('denied')) {
-      return 'Microphone access denied. Please grant microphone permissions and try again.'
+    if (message.includes('audio data recorded') || message.includes('empty audio data')) {
+      return 'No audio data captured. Please ensure your microphone is working and record for a longer duration. If problem persists, check microphone permissions.'
     }
 
     return err.message
@@ -241,28 +282,24 @@ function getDetailedError(err: any): string {
 }
 
 /* ---------- audio processing ---------- */
-async function handleAudioBuffer(audioBuffer: ArrayBuffer) {
+async function handleAudioBuffer(audioBuffer: ArrayBuffer, sourceFileName: string | null = null) {
   if (!onnxService) {
-    error.value = 'ONNX service not initialized'
-    frameData.value = null
-    processedAudioLength.value = null
-    processedFileSizeBytes.value = null
-    processedFileName.value = null
+    reportError('ONNX service not initialized. Model might not have loaded correctly.', 'audio_processing_init_error');
     return
   }
 
   // Check file size
   if (audioBuffer.byteLength > MAX_FILE_SIZE_BYTES) {
-    error.value = `File too large (${(audioBuffer.byteLength / 1024 / 1024).toFixed(2)}MB). Maximum size is ${maxFileSizeMB.value}MB.`
-    frameData.value = null
-    processedAudioLength.value = null
-    processedFileSizeBytes.value = null
-    processedFileName.value = null
+    reportError(
+      `File too large (${(audioBuffer.byteLength / 1024 / 1024).toFixed(2)}MB). Maximum size is ${maxFileSizeMB.value}MB.`,
+      'file_size_limit'
+    )
     return
   }
 
   isProcessing.value = true
-  error.value = null
+  error.value = null // Clear previous errors
+  errorLocation.value = null
 
   try {
     const audioCtx = new AudioContext({ sampleRate: SAMPLE_RATE })
@@ -270,11 +307,10 @@ async function handleAudioBuffer(audioBuffer: ArrayBuffer) {
 
     // Check duration
     if (decoded.duration > MAX_AUDIO_DURATION_SECONDS) {
-      error.value = `Audio too long (${decoded.duration.toFixed(1)}s). Maximum duration is ${MAX_AUDIO_DURATION_SECONDS}s (${maxAudioDurationMinutes.value} minutes).`
-      frameData.value = null
-      processedAudioLength.value = null
-      processedFileSizeBytes.value = null
-      processedFileName.value = null
+      reportError(
+        `Audio too long (${decoded.duration.toFixed(1)}s). Maximum duration is ${MAX_AUDIO_DURATION_SECONDS}s (${maxAudioDurationMinutes.value} minutes).`,
+        'audio_duration_limit'
+      )
       return
     }
 
@@ -296,7 +332,6 @@ async function handleAudioBuffer(audioBuffer: ArrayBuffer) {
     }
 
 
-    // Process entire audio at once
     const result = await onnxService.runInference({
       input_audio: Array.from(normalized)
     })
@@ -307,18 +342,12 @@ async function handleAudioBuffer(audioBuffer: ArrayBuffer) {
       timestamps: new Float32Array(result.timestamps)
     }
 
-    // Set processed audio length and file size ONLY if processing was fully successful
     processedAudioLength.value = decoded.duration;
     processedFileSizeBytes.value = audioBuffer.byteLength;
-    // processedFileName is set by the calling function (uploadAudioFile or recordAudio)
+    processedFileName.value = sourceFileName || `processed_audio_${new Date().toISOString().replace(/[:.]/g, '-')}.data`;
 
   } catch (err) {
-    console.error('Audio processing error:', err)
-    error.value = getDetailedError(err)
-    frameData.value = null
-    processedAudioLength.value = null
-    processedFileSizeBytes.value = null
-    processedFileName.value = null
+    reportError(getDetailedErrorMessage(err), 'audio_processing', err)
   } finally {
     isProcessing.value = false // Ensure processing state is always reset
   }
@@ -326,17 +355,20 @@ async function handleAudioBuffer(audioBuffer: ArrayBuffer) {
 
 /* ---------- recording ---------- */
 const recordAudio = async () => {
-  if (isRecording.value) return // Prevent re-entry if already recording
+  if (isRecording.value) {
+    console.warn("Attempted to start recording while already recording.");
+    return;
+  }
+
+  error.value = null // Clear previous errors
+  errorLocation.value = null
+  frameData.value = null // Clear data immediately on new recording attempt
+  processedAudioLength.value = null; // Reset
+  processedFileSizeBytes.value = null; // Reset
+  processedFileName.value = null; // Reset
+  processedFileName.value = `recorded_audio_${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
 
   try {
-    error.value = null
-    frameData.value = null // Clear data immediately on new recording attempt
-    processedAudioLength.value = null; // Reset
-    processedFileSizeBytes.value = null; // Reset
-    processedFileName.value = null; // Reset
-    // Set a default name for recorded audio
-    processedFileName.value = `recorded_audio_${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
-
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: {
         sampleRate: SAMPLE_RATE,
@@ -360,37 +392,47 @@ const recordAudio = async () => {
 
     recorder.onstop = async () => {
       isRecording.value = false // Set recording to false immediately after stop event
-      stream.getTracks().forEach(track => track.stop())
+      stream.getTracks().forEach(track => track.stop()) // Stop all tracks from the stream
 
       if (chunks.length > 0) {
         const blob = new Blob(chunks, { type: 'audio/webm' })
-        await handleAudioBuffer(await blob.arrayBuffer())
+        await handleAudioBuffer(await blob.arrayBuffer(), processedFileName.value || 'recorded_audio.webm')
       } else {
-        // Handle case where no data was recorded (e.g., very short recording)
-        error.value = 'No audio data recorded. Please ensure your microphone is working and record for a longer duration.'
-        frameData.value = null
-        processedAudioLength.value = null; // Reset
-        processedFileSizeBytes.value = null; // Reset
-        processedFileName.value = null; // Reset on no data
+        reportError('No audio data recorded. Please ensure your microphone is working and record for a longer duration.', 'recording_no_data');
       }
+      recorder = null; // Clean up recorder instance
     }
+
+    recorder.onerror = (event) => {
+      // Accessing event.error for MediaRecorder errors
+      const err = event.error || new Error("Unknown MediaRecorder error");
+      reportError(getDetailedErrorMessage(err), 'recording_error', err);
+      isRecording.value = false; // Ensure state is reset on error
+      stream.getTracks().forEach(track => track.stop()); // Stop tracks on error
+      recorder = null; // Clean up recorder instance
+    };
 
     recorder.start(100) // Collect data every 100ms
 
   } catch (err) {
-    console.error('Recording error:', err)
-    error.value = getDetailedError(err)
-    frameData.value = null // Clear data on recording setup error
-    processedAudioLength.value = null; // Reset
-    processedFileSizeBytes.value = null; // Reset
-    processedFileName.value = null; // Reset on recording error
+    reportError(getDetailedErrorMessage(err), 'microphone_access', err)
     isRecording.value = false // Ensure recording state is reset on error
+    if (recorder && recorder.state !== 'inactive') {
+      recorder.stop(); // Attempt to stop if it somehow started
+    }
   }
 }
 
 const stopRecording = () => {
   if (recorder && recorder.state !== 'inactive') {
     recorder.stop()
+  } else {
+    console.warn("Attempted to stop recording when recorder was not active.");
+    // If for some reason recorder.state is 'inactive' but isRecording is true (desync)
+    if (isRecording.value) {
+      isRecording.value = false; // Force reset UI state
+      reportError('Recording stopped unexpectedly or was already inactive.', 'recording_state_desync');
+    }
   }
 }
 
@@ -402,7 +444,8 @@ const uploadAudioFile = () => {
   input.onchange = async (e) => {
     const file = (e.target as HTMLInputElement).files?.[0]
     if (file) {
-      error.value = null
+      error.value = null // Clear previous errors
+      errorLocation.value = null
       frameData.value = null // Clear data immediately on new upload attempt
       processedAudioLength.value = null; // Reset
       processedFileSizeBytes.value = null; // Reset
@@ -411,14 +454,9 @@ const uploadAudioFile = () => {
       try {
         const arrayBuffer = await file.arrayBuffer()
         processedFileName.value = file.name; // Set file name here for uploaded files
-        await handleAudioBuffer(arrayBuffer)
+        await handleAudioBuffer(arrayBuffer, file.name)
       } catch (err) {
-        console.error('File reading or initial processing error:', err)
-        error.value = getDetailedError(err)
-        frameData.value = null // Clear data on file read error
-        processedAudioLength.value = null; // Reset
-        processedFileSizeBytes.value = null; // Reset
-        processedFileName.value = null; // Reset on error
+        reportError(getDetailedErrorMessage(err), 'file_upload', err)
       } finally {
         isProcessing.value = false // ENSURE isProcessing is reset here!
       }
@@ -429,46 +467,46 @@ const uploadAudioFile = () => {
 
 /* ---------- data export ---------- */
 const downloadData = () => {
-  // Guard clause
   if (!hasData.value || processedAudioLength.value === null || processedFileName.value === null) {
-    console.warn("Attempted to download data before full processing completed or after an error.");
+    reportError("No processed data available to download or metadata is missing.", 'data_export_no_data');
     return;
   }
 
-  const data = {
-    metadata: {
-      timestamp: new Date().toISOString(),
-      fileName: processedFileName.value,
-      audioLengthSeconds: processedAudioLength.value,
-      generatedBy: 'SwiftF0 - Real-time Pitch Detection',
-    },
-    rawData: {
-      timestamps: Array.from(frameData.value.timestamps),
-      pitchData: Array.from(frameData.value.pitch_hz),
-      confidenceData: Array.from(frameData.value.confidence)
-    }
-  };
+  try {
+    const data = {
+      metadata: {
+        timestamp: new Date().toISOString(),
+        fileName: processedFileName.value,
+        audioLengthSeconds: processedAudioLength.value,
+        generatedBy: 'SwiftF0 - Real-time Pitch Detection',
+      },
+      rawData: {
+        timestamps: Array.from(frameData.value.timestamps),
+        pitchData: Array.from(frameData.value.pitch_hz),
+        confidenceData: Array.from(frameData.value.confidence)
+      }
+    };
 
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
 
-  const baseFileName = processedFileName.value
-    ? processedFileName.value.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '')
-    : `pitch-data-${new Date().toISOString().split('T')[0]}`;
-  a.download = baseFileName.endsWith('.json') ? baseFileName : `${baseFileName}.json`;
+    const baseFileName = processedFileName.value
+      ? processedFileName.value.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '')
+      : `pitch-data-${new Date().toISOString().split('T')[0]}`;
+    a.download = baseFileName.endsWith('.json') ? baseFileName : `${baseFileName}.json`;
 
-  document.body.appendChild(a);
+    document.body.appendChild(a);
+    a.click();
 
-  // Perform the click directly, without a setTimeout wrapper
-  a.click();
-
-  // Cleanup: Still use a short timeout for cleanup to ensure browser has time to initiate download.
-  setTimeout(() => {
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, 100);
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 100);
+  } catch (err) {
+    reportError(getDetailedErrorMessage(err), 'data_export_error', err);
+  }
 };
 
 /* ---------- UI helpers ---------- */
@@ -485,12 +523,7 @@ onMounted(async () => {
       isLoadingModel.value = false // Set to false after successful initialization
     }
   } catch (err) {
-    console.error('Failed to initialize ONNX session:', err)
-    error.value = 'Failed to initialize AI model'
-    frameData.value = null
-    processedAudioLength.value = null;
-    processedFileSizeBytes.value = null;
-    processedFileName.value = null;
+    reportError(getDetailedErrorMessage(err), 'model_loading', err)
     isLoadingModel.value = false; // Ensure it's reset even on error
   }
 })
@@ -599,7 +632,12 @@ watch([frequencyRange, threshold], () => {
                 d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
                 clip-rule="evenodd" />
             </svg>
-            <span>{{ error }}</span>
+            <span>
+              <template v-if="errorLocation">
+                **{{ errorLocation.replace(/_/g, ' ').toUpperCase() }} ERROR:**
+              </template>
+              {{ error }}
+            </span>
           </p>
         </div>
       </section>
