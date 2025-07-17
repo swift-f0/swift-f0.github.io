@@ -473,18 +473,55 @@ const downloadData = () => {
   }
 
   try {
+    const combinedData: Array<{
+      timestamp: number;
+      pitch_hz: number;
+      confidence: number;
+      is_voiced: boolean;
+    }> = [];
+
+    let voicedPointsCount = 0;
+
+    for (let i = 0; i < frameData.value.timestamps.length; i++) {
+      const timestamp = frameData.value.timestamps[i];
+      const pitch = frameData.value.pitch_hz[i];
+      const confidence = frameData.value.confidence[i];
+
+      const isCurrentPointVoiced = (
+        confidence > threshold.value &&
+        pitch >= frequencyRange.value[0] &&
+        pitch <= frequencyRange.value[1]
+      );
+
+      if (isCurrentPointVoiced) {
+        voicedPointsCount++;
+      }
+
+      combinedData.push({
+        timestamp: parseFloat(timestamp.toFixed(4)), // Format to 4 decimal places for consistency
+        pitch_hz: parseFloat(pitch.toFixed(2)),     // Format to 2 decimal places
+        confidence: parseFloat(confidence.toFixed(4)), // Format to 4 decimal places
+        is_voiced: isCurrentPointVoiced
+      });
+    }
+
     const data = {
       metadata: {
         timestamp: new Date().toISOString(),
         fileName: processedFileName.value,
         audioLengthSeconds: processedAudioLength.value,
-        generatedBy: 'SwiftF0 - Real-time Pitch Detection',
+        generatedBy: 'SwiftF0',
+        voicedParameters: {
+          description: "Parameters used to determine 'voiced' data points. A point is considered 'voiced' (true) if its confidence is greater than the 'confidenceThreshold' AND its pitch frequency falls within the 'frequencyRangeHz'. Otherwise, it is 'unvoiced' (false).",
+          confidenceThreshold: threshold.value,
+          frequencyRangeHz: frequencyRange.value,
+          globalMinFrequencyHz: FREQ_MIN,
+          globalMaxFrequencyHz: FREQ_MAX
+        },
+        totalPointsCount: combinedData.length,
+        voicedPointsCount: voicedPointsCount
       },
-      rawData: {
-        timestamps: Array.from(frameData.value.timestamps),
-        pitchData: Array.from(frameData.value.pitch_hz),
-        confidenceData: Array.from(frameData.value.confidence)
-      }
+      data: combinedData // Single array containing all data points with the 'is_voiced' flag
     };
 
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -535,24 +572,31 @@ watch(frameData, (newData) => {
     return
   }
 
-  const points: { x: number; y: number; confidence: number }[] = []
+  const points: { x: number; y: number | null; confidence: number }[] = [] // y can now be null
 
   for (let i = 0; i < newData.pitch_hz.length; i++) {
     const conf = newData.confidence[i]
     const pitch = newData.pitch_hz[i]
-
-    if (conf <= threshold.value ||
-      pitch < frequencyRange.value[0] ||
-      pitch > frequencyRange.value[1]) continue
-
     const time = newData.timestamps[i]
-    points.push({ x: time, y: pitch, confidence: conf })
+
+    // Check if the point is "voiced" based on threshold and frequency range
+    if (
+      conf > threshold.value &&
+      pitch >= frequencyRange.value[0] &&
+      pitch <= frequencyRange.value[1]
+    ) {
+      points.push({ x: time, y: pitch, confidence: conf })
+    } else {
+      // If unvoiced, push a null value for 'y' to create a gap in the line
+      points.push({ x: time, y: null, confidence: conf })
+    }
   }
 
   chartData.value = {
     datasets: [{
       ...chartData.value.datasets[0],
-      data: points
+      data: points,
+      spanGaps: false // Explicitly set to false (it's the default, but good for clarity)
     }]
   }
 })
