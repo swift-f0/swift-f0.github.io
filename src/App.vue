@@ -19,6 +19,7 @@ ChartJS.register(LinearScale, PointElement, LineElement, Tooltip, Filler)
 /* ---------- reactive state ---------- */
 const isRecording = ref(false)
 const isProcessing = ref(false)
+const isLoadingModel = ref(true) // New reactive state for model loading
 const error = ref<string | null>(null)
 
 /* Extended type with real timestamps */
@@ -481,6 +482,7 @@ onMounted(async () => {
     if (!onnxService) {
       onnxService = new ONNXService('model.onnx')
       await onnxService.initializeSession()
+      isLoadingModel.value = false // Set to false after successful initialization
     }
   } catch (err) {
     console.error('Failed to initialize ONNX session:', err)
@@ -489,6 +491,7 @@ onMounted(async () => {
     processedAudioLength.value = null;
     processedFileSizeBytes.value = null;
     processedFileName.value = null;
+    isLoadingModel.value = false; // Ensure it's reset even on error
   }
 })
 
@@ -557,9 +560,20 @@ watch([frequencyRange, threshold], () => {
 
       <section class="mb-8">
         <h2 class="text-white text-lg sm:text-xl font-bold mb-4">Audio Input</h2>
-        <div class="flex flex-col sm:flex-row gap-3">
+        <div v-if="isLoadingModel"
+          class="p-4 bg-[#1a1f17] rounded-lg border border-[#2d372a] text-white/80 flex items-center justify-center">
+          <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none"
+            viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+            </path>
+          </svg>
+          <span>Loading AI Model... Please wait.</span>
+        </div>
+        <div v-else class="flex flex-col sm:flex-row gap-3">
           <button @click="isRecording ? stopRecording() : recordAudio()" :disabled="isProcessing" :class="[
-            'flex-1 sm:flex-none min-w-[140px] h-11 px-6 rounded-lg font-bold text-sm transition-all duration-200',
+            'w-full sm:w-auto min-w-[140px] h-11 px-6 rounded-lg font-bold text-sm transition-all duration-200',
             isRecording
               ? 'bg-red-500 hover:bg-red-600 text-white'
               : 'bg-[#53d22c] hover:bg-[#4bc228] text-[#131712]',
@@ -569,7 +583,7 @@ watch([frequencyRange, threshold], () => {
           </button>
 
           <button @click="uploadAudioFile" :disabled="isProcessing || isRecording"
-            class="flex-1 sm:flex-none min-w-[140px] h-11 px-6 rounded-lg bg-[#2d372a] hover:bg-[#3d473a] text-white font-bold text-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
+            class="w-full sm:w-auto min-w-[140px] h-11 px-6 rounded-lg bg-[#2d372a] hover:bg-[#3d473a] text-white font-bold text-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
             {{ isProcessing && !isRecording ? 'Processing...' : 'Upload File' }}
           </button>
         </div>
@@ -594,7 +608,7 @@ watch([frequencyRange, threshold], () => {
         <h2 class="text-white text-lg sm:text-xl font-bold mb-4">Parameters</h2>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-          <div class="bg-[#1a1f17] rounded-lg p-6 border border-[#2d372a]">
+          <div class="bg-[#1a1f17] rounded-lg p-4 border border-[#2d372a]">
             <div class="flex items-center justify-between mb-4">
               <label class="text-white text-base font-medium">Confidence Threshold</label>
               <span class="text-white text-sm bg-[#2d372a] px-2 py-1 rounded">
@@ -613,7 +627,7 @@ watch([frequencyRange, threshold], () => {
             </div>
           </div>
 
-          <div class="bg-[#1a1f17] rounded-lg p-6 border border-[#2d372a]">
+          <div class="bg-[#1a1f17] rounded-lg p-4 border border-[#2d372a]">
             <div class="flex items-center justify-between mb-4">
               <label class="text-white text-base font-medium">Frequency Range</label>
             </div>
@@ -698,7 +712,7 @@ watch([frequencyRange, threshold], () => {
       <section>
         <div class="flex flex-col sm:flex-row gap-3">
           <button @click="downloadData" :disabled="!hasData"
-            class="flex-1 sm:flex-none min-w-[140px] h-11 px-6 rounded-lg bg-[#2d372a] hover:bg-[#3d473a] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm transition-all duration-200">
+            class="w-full sm:w-auto min-w-[140px] h-11 px-6 rounded-lg bg-[#2d372a] hover:bg-[#3d473a] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm transition-all duration-200">
             Export Data
           </button>
         </div>
