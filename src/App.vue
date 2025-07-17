@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { ONNXService } from '@/ONNXService'
 import Slider from '@vueform/slider'
 import { Line } from 'vue-chartjs'
@@ -20,6 +20,7 @@ ChartJS.register(LinearScale, PointElement, LineElement, Tooltip, Filler)
 const isRecording = ref(false)
 const isProcessing = ref(false)
 const isLoadingModel = ref(true) // New reactive state for model loading
+const showExtendedLoadingMessage = ref(false) // NEW: Controls when to show extended message
 
 const error = ref<string | null>(null)
 const errorLocation = ref<string | null>(null) // New: To specify where the error occurred
@@ -35,6 +36,14 @@ const frameData = ref<{
 const processedAudioLength = ref<number | null>(null)
 const processedFileSizeBytes = ref<number | null>(null)
 const processedFileName = ref<string | null>(null)
+
+// --- NEW: Timer related reactive state ---
+const modelLoadStartTime = ref<number | null>(null);
+const elapsedLoadTime = ref(0);
+let loadTimerInterval: ReturnType<typeof setInterval> | null = null;
+let extendedMessageTimeout: ReturnType<typeof setTimeout> | null = null; // NEW
+// -----------------------------------------
+
 
 let onnxService: ONNXService | null = null
 let recorder: MediaRecorder | null = null
@@ -114,6 +123,14 @@ const recordButtonText = computed(() => {
   if (isRecording.value) return 'Stop Recording';
   return 'Record Audio';
 });
+
+// --- NEW: Formatted elapsed time computed property ---
+const formattedElapsedTime = computed(() => {
+  const minutes = Math.floor(elapsedLoadTime.value / 60);
+  const seconds = elapsedLoadTime.value % 60;
+  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+});
+// -----------------------------------------------------
 
 /* ---------- chart configuration ---------- */
 const chartData = ref<ChartData<'line'>>({
@@ -499,7 +516,7 @@ const downloadData = () => {
 
       combinedData.push({
         timestamp: parseFloat(timestamp.toFixed(4)), // Format to 4 decimal places for consistency
-        pitch_hz: parseFloat(pitch.toFixed(2)),     // Format to 2 decimal places
+        pitch_hz: parseFloat(pitch.toFixed(2)),       // Format to 2 decimal places
         confidence: parseFloat(confidence.toFixed(4)), // Format to 4 decimal places
         is_voiced: isCurrentPointVoiced
       });
@@ -555,15 +572,62 @@ const updateThreshold = (e: Event) => {
 onMounted(async () => {
   try {
     if (!onnxService) {
+      // Start timer when model loading begins
+      isLoadingModel.value = true;
+      modelLoadStartTime.value = Date.now();
+      elapsedLoadTime.value = 0;
+
+      // NEW: Show extended message after 3 seconds
+      extendedMessageTimeout = setTimeout(() => {
+        showExtendedLoadingMessage.value = true;
+      }, 3000);
+
+      loadTimerInterval = setInterval(() => {
+        if (modelLoadStartTime.value) {
+          elapsedLoadTime.value = Math.floor((Date.now() - modelLoadStartTime.value) / 1000);
+        }
+      }, 1000);
+
       onnxService = new ONNXService('model.onnx')
       await onnxService.initializeSession()
-      isLoadingModel.value = false // Set to false after successful initialization
+
+      // Stop and clear timer when model loading ends
+      if (loadTimerInterval) {
+        clearInterval(loadTimerInterval);
+        loadTimerInterval = null;
+      }
+      if (extendedMessageTimeout) { // NEW: Clear timeout if model loaded quickly
+        clearTimeout(extendedMessageTimeout);
+        extendedMessageTimeout = null;
+      }
+      modelLoadStartTime.value = null;
+      elapsedLoadTime.value = 0;
+      isLoadingModel.value = false
     }
   } catch (err) {
     reportError(getDetailedErrorMessage(err), 'model_loading', err)
-    isLoadingModel.value = false; // Ensure it's reset even on error
+    isLoadingModel.value = false;
+    if (loadTimerInterval) {
+      clearInterval(loadTimerInterval);
+      loadTimerInterval = null;
+    }
+    if (extendedMessageTimeout) { // NEW: Clear timeout on error
+      clearTimeout(extendedMessageTimeout);
+      extendedMessageTimeout = null;
+    }
+    modelLoadStartTime.value = null;
+    elapsedLoadTime.value = 0;
   }
 })
+
+onUnmounted(() => {
+  if (loadTimerInterval) {
+    clearInterval(loadTimerInterval);
+  }
+  if (extendedMessageTimeout) {
+    clearTimeout(extendedMessageTimeout);
+  }
+});
 
 /* ---------- data to chart transformation ---------- */
 watch(frameData, (newData) => {
@@ -619,7 +683,10 @@ watch([frequencyRange, threshold], () => {
           SwiftF0
         </h1>
         <p class="text-white/80 text-sm sm:text-base leading-relaxed mb-4">
-        Analyze pitch from audio or files. Adjust frequency range to improve accuracy: typical human voices fall between <strong>80–300 Hz</strong>. For instruments, middle C is <strong>261.6 Hz</strong>, low guitar E is <strong>82.4 Hz</strong>. Confidence threshold ranges from 0–100%; around <strong>90%</strong> works best in clean recordings. Narrowing the frequency range and tuning confidence can reduce noise and improve detection.
+          Analyze pitch from audio or files. Adjust frequency range to improve accuracy: typical human voices fall
+          between <strong>80–300 Hz</strong>. For instruments, middle C is <strong>261.6 Hz</strong>, low guitar E is
+          <strong>82.4 Hz</strong>. Confidence threshold ranges from 0–100%; around <strong>90%</strong> works best in
+          clean recordings. Narrowing the frequency range and tuning confidence can reduce noise and improve detection.
         </p>
 
         <div class="flex flex-wrap gap-3 text-sm">
@@ -645,7 +712,14 @@ watch([frequencyRange, threshold], () => {
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
             </path>
           </svg>
-          <span>Loading AI Model... Please wait.</span>
+          <span>
+            <template v-if="!showExtendedLoadingMessage">
+              Loading AI Model... Please wait
+            </template>
+            <template v-else>
+              Loading AI Model... This may take up to a minute or so. Elapsed: {{ formattedElapsedTime }}
+            </template>
+          </span>
         </div>
         <div v-else class="flex flex-col sm:flex-row gap-3">
           <button @click="isRecording ? stopRecording() : recordAudio()" :disabled="isProcessing" :class="[
