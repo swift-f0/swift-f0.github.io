@@ -714,10 +714,10 @@ watch([frequencyRange, threshold], () => {
           </svg>
           <span>
             <template v-if="!showExtendedLoadingMessage">
-              Loading AI Model... Please wait
+              Loading AI Model...
             </template>
             <template v-else>
-              Loading AI Model... This may take up to a minute or so. Elapsed: {{ formattedElapsedTime }}
+              Still loading, almost there... {{ formattedElapsedTime }} seconds
             </template>
           </span>
         </div>
