@@ -59,6 +59,13 @@ const SAMPLE_RATE = 16000
 const MAX_AUDIO_DURATION_SECONDS = 300 // 5 minutes in seconds
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024 // 10MB
 
+// Centralized parameters for the note segmentation algorithm
+const SEGMENTATION_PARAMS = {
+  splitSemitoneThreshold: 0.8,
+  minNoteDuration: 0.05,
+  unvoicedGracePeriod: 0.02,
+};
+
 // Expose for UI
 const maxFileSizeMB = computed(() => MAX_FILE_SIZE_BYTES / 1024 / 1024)
 const maxAudioDurationMinutes = computed(() => MAX_AUDIO_DURATION_SECONDS / 60)
@@ -122,6 +129,325 @@ const displayStats = computed(() => {
 const recordButtonText = computed(() => {
   if (isRecording.value) return 'Stop Recording';
   return 'Record Audio';
+});
+
+// --- Download Handler Functions ---
+
+/**
+ * Exports all processed data, including metadata and note segments, to a JSON file.
+ */
+const downloadData = () => {
+  if (!hasData.value || !processedFrameData.value || !noteSegments.value) {
+    reportError("No processed data available to download.", 'data_export_no_data');
+    return;
+  }
+
+  try {
+    const data = {
+      metadata: {
+        timestamp: new Date().toISOString(),
+        fileName: processedFileName.value,
+        audioLengthSeconds: processedAudioLength.value,
+        generatedBy: 'SwiftF0',
+        voicedParameters: {
+          confidenceThreshold: threshold.value,
+          frequencyRangeHz: frequencyRange.value//,
+          //globalMinFrequencyHz: FREQ_MIN,
+          //globalMaxFrequencyHz: FREQ_MAX
+        },
+        noteSegmentationParameters: {
+          ...SEGMENTATION_PARAMS
+        },
+        totalPointsCount: processedFrameData.value.length,
+        voicedPointsCount: voicedFlags.value.filter(v => v).length,
+        noteSegmentsCount: noteSegments.value.length
+      },
+      frameData: processedFrameData.value,
+      noteSegments: noteSegments.value
+    };
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    triggerDownload(blob, '.json');
+  } catch (err) {
+    reportError(getDetailedErrorMessage(err), 'data_export_error', err);
+  }
+};
+
+/**
+ * Exports the detected note segments to a standard MIDI file.
+ */
+const downloadMidi = () => {
+  if (!hasData.value || noteSegments.value.length === 0) {
+    reportError("No note segments found to export to MIDI.", 'midi_export_no_notes');
+    return;
+  }
+
+  try {
+    // createMidiFile now accepts tempo and velocity for better parity with the Python version
+    const midiData = createMidiFile(noteSegments.value, { tempo: 120, velocity: 80 });
+    const blob = new Blob([midiData], { type: 'audio/midi' });
+    triggerDownload(blob, '.mid');
+  } catch (err) {
+    reportError(getDetailedErrorMessage(err), 'midi_export_error', err);
+  }
+};
+
+/**
+ * Helper function to trigger a file download in the browser.
+ */
+const triggerDownload = (blob, extension) => {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.style.display = 'none';
+  a.href = url;
+
+  const baseFileName = processedFileName.value
+    ? processedFileName.value.replace(/\.[^/.]+$/, "").replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '')
+    : `pitch-data-${new Date().toISOString().split('T')[0]}`;
+
+  a.download = `${baseFileName}${extension}`;
+  document.body.appendChild(a);
+  a.click();
+
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 100);
+};
+
+
+// --- Core Algorithms & Helpers ---
+
+/**
+ * Calculates the median of an array of numbers.
+ */
+const median = (arr) => {
+  if (arr.length === 0) return 0;
+  const sorted = [...arr].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+};
+
+/**
+ * Segments a pitch contour into discrete musical notes, ported from the Python implementation.
+ */
+const segmentNotes = (timestamps, pitchHz, voicing, params) => {
+  if (timestamps.length === 0) return [];
+
+  const framePeriod = timestamps.length > 1 ? timestamps[1] - timestamps[0] : 0.016;
+  const notes = [];
+  let currentNoteSegment = null;
+  let unvoicedFramesCount = 0;
+
+  const midiContour = pitchHz.map((pitch, i) => {
+    if (voicing[i] && pitch > 0) {
+      const validPitch = Math.max(pitch, 1e-6);
+      return 69 + 12 * Math.log2(validPitch / 440.0);
+    }
+    return NaN;
+  });
+
+  for (let i = 0; i < voicing.length; i++) {
+    const t = timestamps[i];
+    const isVoiced = voicing[i];
+    const midiPitch = midiContour[i];
+
+    if (isVoiced && !isNaN(midiPitch)) {
+      unvoicedFramesCount = 0;
+      if (currentNoteSegment === null) {
+        currentNoteSegment = { start: t, end: t + framePeriod, samples: [midiPitch] };
+      } else {
+        const currentMedian = median(currentNoteSegment.samples);
+        const pitchDeviation = Math.abs(midiPitch - currentMedian);
+        if (pitchDeviation >= params.splitSemitoneThreshold) {
+          notes.push(currentNoteSegment);
+          currentNoteSegment = { start: t, end: t + framePeriod, samples: [midiPitch] };
+        } else {
+          currentNoteSegment.samples.push(midiPitch);
+          currentNoteSegment.end = t + framePeriod;
+        }
+      }
+    } else { // Unvoiced frame
+      if (currentNoteSegment !== null) {
+        unvoicedFramesCount++;
+        const unvoicedDuration = unvoicedFramesCount * framePeriod;
+        if (unvoicedDuration >= params.unvoicedGracePeriod) {
+          notes.push(currentNoteSegment);
+          currentNoteSegment = null;
+          unvoicedFramesCount = 0;
+        } else {
+          currentNoteSegment.end = t + framePeriod;
+        }
+      }
+    }
+  }
+
+  if (currentNoteSegment !== null) {
+    notes.push(currentNoteSegment);
+  }
+
+  if (notes.length === 0) return [];
+
+  const processedNotes = notes
+    .map(segment => {
+      const duration = segment.end - segment.start;
+      if (duration >= params.minNoteDuration && segment.samples.length > 0) {
+        const medianPitchMidi = median(segment.samples);
+        const medianPitchHz = 440.0 * Math.pow(2, (medianPitchMidi - 69) / 12);
+        return {
+          start: segment.start,
+          end: segment.end,
+          pitch_median: medianPitchHz,
+          midi_pitch: Math.round(medianPitchMidi),
+        };
+      }
+      return null;
+    })
+    .filter(Boolean);
+
+  if (processedNotes.length === 0) return [];
+
+  const finalNotes = [processedNotes[0]];
+  const epsilon = 1e-9;
+  for (let i = 1; i < processedNotes.length; i++) {
+    const currentNote = processedNotes[i];
+    const previousNote = finalNotes[finalNotes.length - 1];
+    const gap = currentNote.start - previousNote.end;
+
+    if (gap <= framePeriod + epsilon && previousNote.midi_pitch === currentNote.midi_pitch) {
+      previousNote.end = currentNote.end; // Merge notes
+    } else {
+      finalNotes.push(currentNote);
+    }
+  }
+
+  return finalNotes.map(note => ({
+    start: parseFloat(note.start.toFixed(4)),
+    end: parseFloat(note.end.toFixed(4)),
+    pitch_median: parseFloat(note.pitch_median.toFixed(2)),
+    pitch_midi: note.midi_pitch,
+  }));
+};
+
+/**
+ * Creates a raw MIDI file (as a Uint8Array) from note segments.
+ */
+const createMidiFile = (noteSegments, { tempo = 120, velocity = 80 } = {}) => {
+  const HEADER_CHUNK_TYPE = [0x4d, 0x54, 0x68, 0x64]; // "MThd"
+  const HEADER_CHUNK_LENGTH = [0x00, 0x00, 0x00, 0x06];
+  const FORMAT_TYPE = [0x00, 0x00]; // Format 0 (single track)
+  const NUMBER_OF_TRACKS = [0x00, 0x01];
+  const TICKS_PER_QUARTER_NOTE = 480;
+  const TIME_DIVISION = [(TICKS_PER_QUARTER_NOTE >> 8) & 0xff, TICKS_PER_QUARTER_NOTE & 0xff];
+  const TRACK_CHUNK_TYPE = [0x4d, 0x54, 0x72, 0x6b]; // "MTrk"
+
+  const encodeVariableLength = (value) => {
+    let buffer = value & 0x7f;
+    while ((value >>= 7) > 0) {
+      buffer <<= 8;
+      buffer |= (value & 0x7f) | 0x80;
+    }
+    const bytes = [];
+    while (true) {
+      bytes.push(buffer & 0xff);
+      if (buffer & 0x80) buffer >>= 8;
+      else break;
+    }
+    return bytes;
+  };
+
+  const secondsToTicks = (seconds) => Math.round(seconds * TICKS_PER_QUARTER_NOTE * (tempo / 60));
+
+  const trackEvents = [];
+  let lastEventTicks = 0;
+
+  // Tempo Event (microseconds per quarter note)
+  const microSecondsPerBeat = Math.round(60000000 / tempo);
+  trackEvents.push(0x00, 0xff, 0x51, 0x03,
+    (microSecondsPerBeat >> 16) & 0xff,
+    (microSecondsPerBeat >> 8) & 0xff,
+    microSecondsPerBeat & 0xff
+  );
+
+  const sortedNotes = [...noteSegments].sort((a, b) => a.start - b.start);
+
+  for (const note of sortedNotes) {
+    const startTicks = secondsToTicks(note.start);
+    const endTicks = secondsToTicks(note.end);
+    const midiNote = Math.max(0, Math.min(127, note.pitch_midi));
+
+    // Note On event
+    const onDelta = startTicks - lastEventTicks;
+    trackEvents.push(...encodeVariableLength(onDelta), 0x90, midiNote, Math.min(127, velocity));
+    lastEventTicks = startTicks;
+
+    // Note Off event
+    const offDelta = endTicks - lastEventTicks;
+    trackEvents.push(...encodeVariableLength(offDelta), 0x80, midiNote, Math.min(127, velocity));
+    lastEventTicks = endTicks;
+  }
+
+  // End of Track event
+  trackEvents.push(...encodeVariableLength(0), 0xff, 0x2f, 0x00);
+
+  const trackLength = trackEvents.length;
+  const trackLengthBytes = [
+    (trackLength >> 24) & 0xff, (trackLength >> 16) & 0xff,
+    (trackLength >> 8) & 0xff, trackLength & 0xff
+  ];
+
+  return new Uint8Array([
+    ...HEADER_CHUNK_TYPE, ...HEADER_CHUNK_LENGTH, ...FORMAT_TYPE, ...NUMBER_OF_TRACKS, ...TIME_DIVISION,
+    ...TRACK_CHUNK_TYPE, ...trackLengthBytes, ...trackEvents
+  ]);
+};
+
+// --- Reactive Derived Data (Computed Properties) ---
+
+/**
+ * Computes a boolean array indicating if each frame is voiced based on current settings.
+ * This is reactive and will update automatically if the threshold or frequency range changes.
+ */
+const voicedFlags = computed(() => {
+  if (!hasData.value) return [];
+  // FIX: Convert Float32Array to a standard array before mapping to ensure it returns booleans.
+  return Array.from(frameData.value!.pitch_hz).map((pitch, i) => {
+    const confidence = frameData.value!.confidence[i];
+    return (
+      confidence > threshold.value &&
+      pitch >= frequencyRange.value[0] &&
+      pitch <= frequencyRange.value[1]
+    );
+  });
+});
+
+/**
+ * Computes the final note segments using the segmentation algorithm.
+ * This is also reactive and depends on the raw frame data and voicedFlags.
+ */
+const noteSegments = computed(() => {
+  if (!hasData.value) return [];
+  return segmentNotes(
+    frameData.value!.timestamps,
+    frameData.value!.pitch_hz,
+    voicedFlags.value,
+    SEGMENTATION_PARAMS
+  );
+});
+
+/**
+ * Computes the full frame-by-frame data for JSON export.
+ * This combines the raw data with the calculated `is_voiced` status.
+ */
+const processedFrameData = computed(() => {
+  if (!hasData.value) return [];
+  // FIX: Convert Float32Array to a standard array before mapping to ensure it returns objects.
+  return Array.from(frameData.value!.timestamps).map((timestamp, i) => ({
+    timestamp: parseFloat(timestamp.toFixed(4)),
+    pitch_hz: parseFloat(frameData.value!.pitch_hz[i].toFixed(2)),
+    confidence: parseFloat(frameData.value!.confidence[i].toFixed(4)),
+    is_voiced: voicedFlags.value[i],
+  }));
 });
 
 // -----------------------------------------------------
@@ -476,87 +802,6 @@ const uploadAudioFile = () => {
   input.click()
 }
 
-/* ---------- data export ---------- */
-const downloadData = () => {
-  if (!hasData.value || processedAudioLength.value === null || processedFileName.value === null) {
-    reportError("No processed data available to download or metadata is missing.", 'data_export_no_data');
-    return;
-  }
-
-  try {
-    const combinedData: Array<{
-      timestamp: number;
-      pitch_hz: number;
-      confidence: number;
-      is_voiced: boolean;
-    }> = [];
-
-    let voicedPointsCount = 0;
-
-    for (let i = 0; i < frameData.value.timestamps.length; i++) {
-      const timestamp = frameData.value.timestamps[i];
-      const pitch = frameData.value.pitch_hz[i];
-      const confidence = frameData.value.confidence[i];
-
-      const isCurrentPointVoiced = (
-        confidence > threshold.value &&
-        pitch >= frequencyRange.value[0] &&
-        pitch <= frequencyRange.value[1]
-      );
-
-      if (isCurrentPointVoiced) {
-        voicedPointsCount++;
-      }
-
-      combinedData.push({
-        timestamp: parseFloat(timestamp.toFixed(4)), // Format to 4 decimal places for consistency
-        pitch_hz: parseFloat(pitch.toFixed(2)),       // Format to 2 decimal places
-        confidence: parseFloat(confidence.toFixed(4)), // Format to 4 decimal places
-        is_voiced: isCurrentPointVoiced
-      });
-    }
-
-    const data = {
-      metadata: {
-        timestamp: new Date().toISOString(),
-        fileName: processedFileName.value,
-        audioLengthSeconds: processedAudioLength.value,
-        generatedBy: 'SwiftF0',
-        voicedParameters: {
-          description: "Parameters used to determine 'voiced' data points. A point is considered 'voiced' (true) if its confidence is greater than the 'confidenceThreshold' AND its pitch frequency falls within the 'frequencyRangeHz'. Otherwise, it is 'unvoiced' (false).",
-          confidenceThreshold: threshold.value,
-          frequencyRangeHz: frequencyRange.value,
-          globalMinFrequencyHz: FREQ_MIN,
-          globalMaxFrequencyHz: FREQ_MAX
-        },
-        totalPointsCount: combinedData.length,
-        voicedPointsCount: voicedPointsCount
-      },
-      data: combinedData // Single array containing all data points with the 'is_voiced' flag
-    };
-
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-
-    const baseFileName = processedFileName.value
-      ? processedFileName.value.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '')
-      : `pitch-data-${new Date().toISOString().split('T')[0]}`;
-    a.download = baseFileName.endsWith('.json') ? baseFileName : `${baseFileName}.json`;
-
-    document.body.appendChild(a);
-    a.click();
-
-    setTimeout(() => {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 100);
-  } catch (err) {
-    reportError(getDetailedErrorMessage(err), 'data_export_error', err);
-  }
-};
-
 /* ---------- UI helpers ---------- */
 const updateThreshold = (e: Event) => {
   threshold.value = parseFloat((e.target as HTMLInputElement).value)
@@ -860,9 +1105,17 @@ watch([frequencyRange, threshold], () => {
 
       <section>
         <div class="flex flex-col sm:flex-row gap-3">
+          <button @click="downloadMidi" :disabled="!hasData || isProcessing"
+            class="w-full sm:w-auto min-w-[140px] h-11 px-6 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm transition-all duration-200 flex items-center justify-center gap-2">
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path
+                d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 1.343-3 3s1.343 3 3 3 3-1.343 3-3V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 1.343-3 3s1.343 3 3 3 3-1.343 3-3V3z" />
+            </svg>
+            Export MIDI
+          </button>
           <button @click="downloadData" :disabled="!hasData"
             class="w-full sm:w-auto min-w-[140px] h-11 px-6 rounded-lg bg-[#2d372a] hover:bg-[#3d473a] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm transition-all duration-200">
-            Export Data
+            Export JSON
           </button>
         </div>
       </section>
