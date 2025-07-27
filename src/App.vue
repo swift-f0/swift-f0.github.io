@@ -13,17 +13,25 @@ import {
   type ChartOptions,
   type ChartData
 } from 'chart.js'
+import MidiPlayer from '@/components/MidiPlayer.vue'
 
 ChartJS.register(LinearScale, PointElement, LineElement, Tooltip, Filler)
 
 /* ---------- reactive state ---------- */
 const isRecording = ref(false)
+const processingSource = ref(null)
 const isProcessing = ref(false)
-const isLoadingModel = ref(true) // New reactive state for model loading
-const showExtendedLoadingMessage = ref(false) // NEW: Controls when to show extended message
+const isLoadingModel = ref(true)
+const showExtendedLoadingMessage = ref(false)
+const activeTab = ref<'pitch' | 'midi'>('pitch')
 
 const error = ref<string | null>(null)
-const errorLocation = ref<string | null>(null) // New: To specify where the error occurred
+const errorLocation = ref<string | null>(null)
+
+// MIDI Player state
+const midiBuffer = ref<ArrayBuffer | null>(null)
+const midiInfo = ref<any>(null)
+const isGeneratingMidi = ref(false)
 
 /* Extended type with real timestamps */
 const frameData = ref<{
@@ -32,32 +40,33 @@ const frameData = ref<{
   timestamps: Float32Array
 } | null>(null)
 
+const noteSegments = ref<any[]>([]);
+const processedFrameData = ref<any[]>([]);
+
 // Reactive variables for metadata
 const processedAudioLength = ref<number | null>(null)
 const processedFileSizeBytes = ref<number | null>(null)
 const processedFileName = ref<string | null>(null)
 
-// --- NEW: Timer related reactive state ---
+// Timer related reactive state
 const modelLoadStartTime = ref<number | null>(null);
 const elapsedLoadTime = ref(0);
 let loadTimerInterval: ReturnType<typeof setInterval> | null = null;
-let extendedMessageTimeout: ReturnType<typeof setTimeout> | null = null; // NEW
-// -----------------------------------------
-
+let extendedMessageTimeout: ReturnType<typeof setTimeout> | null = null;
 
 let onnxService: ONNXService | null = null
 let recorder: MediaRecorder | null = null
 let recordingStartTime = 0
 
-const threshold = ref<number>(0.9) // Explicitly typed as number
-const frequencyRange = ref([80, 300])
+const threshold = ref<number>(0.9)
 
 /* ---------- constants ---------- */
 const FREQ_MIN = 46.875
 const FREQ_MAX = 2093.75
+const frequencyRange = ref([FREQ_MIN, FREQ_MAX])
 const SAMPLE_RATE = 16000
-const MAX_AUDIO_DURATION_SECONDS = 300 // 5 minutes in seconds
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024 // 10MB
+const MAX_AUDIO_DURATION_SECONDS = 300
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
 
 // Centralized parameters for the note segmentation algorithm
 const SEGMENTATION_PARAMS = {
@@ -66,6 +75,9 @@ const SEGMENTATION_PARAMS = {
   unvoicedGracePeriod: 0.02,
 };
 
+// Note names for MIDI display
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
 // Expose for UI
 const maxFileSizeMB = computed(() => MAX_FILE_SIZE_BYTES / 1024 / 1024)
 const maxAudioDurationMinutes = computed(() => MAX_AUDIO_DURATION_SECONDS / 60)
@@ -73,7 +85,7 @@ const maxAudioDurationMinutes = computed(() => MAX_AUDIO_DURATION_SECONDS / 60)
 /* ---------- computed properties ---------- */
 const hasData = computed(() => frameData.value && frameData.value.pitch_hz.length > 0)
 
-const dataStats = computed(() => {
+const pitchStats = computed(() => {
   if (!frameData.value) return null
 
   const validPoints = []
@@ -98,7 +110,7 @@ const dataStats = computed(() => {
     }
   }
 
-  const sorted = [...validPoints].sort((a, b) => a - b) // Create a copy before sorting
+  const sorted = [...validPoints].sort((a, b) => a - b)
   const avg = validPoints.reduce((a, b) => a + b, 0) / validPoints.length
   const median = sorted[Math.floor(sorted.length / 2)]
 
@@ -112,10 +124,42 @@ const dataStats = computed(() => {
   }
 })
 
-// Always returns stats object for consistent display
-const displayStats = computed(() => {
-  if (dataStats.value) return dataStats.value
+const midiStats = computed(() => {
+  if (!noteSegments.value || noteSegments.value.length === 0) {
+    return {
+      count: 0,
+      average: null,
+      median: null,
+      min: null,
+      max: null,
+      range: null
+    }
+  }
 
+  const midiNotes = noteSegments.value.map(note => note.pitch_midi)
+  const sorted = [...midiNotes].sort((a, b) => a - b)
+  const avg = midiNotes.reduce((a, b) => a + b, 0) / midiNotes.length
+  const median = sorted[Math.floor(sorted.length / 2)]
+
+  return {
+    count: noteSegments.value.length,
+    average: avg,
+    median: median,
+    min: sorted[0],
+    max: sorted[sorted.length - 1],
+    range: sorted[sorted.length - 1] - sorted[0]
+  }
+})
+
+// Helper function to convert MIDI note to name
+const midiToNoteName = (midiNote: number): string => {
+  const octave = Math.floor(midiNote / 12) - 1
+  const noteIndex = midiNote % 12
+  return `${NOTE_NAMES[noteIndex]}${octave}`
+}
+
+const displayPitchStats = computed(() => {
+  if (pitchStats.value) return pitchStats.value
   return {
     count: null,
     average: null,
@@ -126,16 +170,30 @@ const displayStats = computed(() => {
   }
 })
 
+const displayMidiStats = computed(() => {
+  if (midiStats.value) return midiStats.value
+  return {
+    count: null,
+    average: null,
+    median: null,
+    min: null,
+    max: null,
+    range: null
+  }
+})
+
 const recordButtonText = computed(() => {
   if (isRecording.value) return 'Stop Recording';
   return 'Record Audio';
 });
 
+const hasMidiData = computed(() => midiBuffer.value !== null)
+const hasPlayableNotes = computed(() => {
+  return noteSegments.value && noteSegments.value.length > 0
+})
+
 // --- Download Handler Functions ---
 
-/**
- * Exports all processed data, including metadata and note segments, to a JSON file.
- */
 const downloadData = () => {
   if (!hasData.value || !processedFrameData.value || !noteSegments.value) {
     reportError("No processed data available to download.", 'data_export_no_data');
@@ -151,15 +209,13 @@ const downloadData = () => {
         generatedBy: 'SwiftF0',
         voicedParameters: {
           confidenceThreshold: threshold.value,
-          frequencyRangeHz: frequencyRange.value//,
-          //globalMinFrequencyHz: FREQ_MIN,
-          //globalMaxFrequencyHz: FREQ_MAX
+          frequencyRangeHz: frequencyRange.value
         },
         noteSegmentationParameters: {
           ...SEGMENTATION_PARAMS
         },
-        totalPointsCount: processedFrameData.value.length,
-        voicedPointsCount: voicedFlags.value.filter(v => v).length,
+        totalFramesCount: processedFrameData.value.length,
+        voicedFramesCount: voicedFlags.value.filter(v => v).length,
         noteSegmentsCount: noteSegments.value.length
       },
       frameData: processedFrameData.value,
@@ -173,9 +229,6 @@ const downloadData = () => {
   }
 };
 
-/**
- * Exports the detected note segments to a standard MIDI file.
- */
 const downloadMidi = () => {
   if (!hasData.value || noteSegments.value.length === 0) {
     reportError("No note segments found to export to MIDI.", 'midi_export_no_notes');
@@ -183,7 +236,6 @@ const downloadMidi = () => {
   }
 
   try {
-    // createMidiFile now accepts tempo and velocity for better parity with the Python version
     const midiData = createMidiFile(noteSegments.value, { tempo: 120, velocity: 80 });
     const blob = new Blob([midiData], { type: 'audio/midi' });
     triggerDownload(blob, '.mid');
@@ -192,10 +244,42 @@ const downloadMidi = () => {
   }
 };
 
-/**
- * Helper function to trigger a file download in the browser.
- */
-const triggerDownload = (blob, extension) => {
+const generateMidiForPlayer = async () => {
+  if (!hasData.value || noteSegments.value.length === 0) {
+    midiInfo.value = null;
+    midiBuffer.value = null;
+    return;
+  }
+
+  isGeneratingMidi.value = true;
+
+  try {
+    // Data for MIDI Info Display
+    const duration = noteSegments.value.reduce((max, note) => Math.max(max, note.end), 0);
+    const totalNotes = noteSegments.value.length;
+    midiInfo.value = {
+      duration: duration,
+      tracks: [{ name: 'Track 1' }],
+      totalNotes: totalNotes,
+    };
+
+    // Data for MIDI EXPORT Button
+    const midiUint8Array = createMidiFile(noteSegments.value, { tempo: 120, velocity: 80 });
+    midiBuffer.value = midiUint8Array.buffer.slice(
+      midiUint8Array.byteOffset,
+      midiUint8Array.byteOffset + midiUint8Array.byteLength
+    );
+
+  } catch (err: any) {
+    reportError(getDetailedErrorMessage(err), 'data_preparation_error', err);
+    midiInfo.value = null;
+    midiBuffer.value = null;
+  } finally {
+    isGeneratingMidi.value = false;
+  }
+};
+
+const triggerDownload = (blob: Blob, extension: string) => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.style.display = 'none';
@@ -215,31 +299,35 @@ const triggerDownload = (blob, extension) => {
   }, 100);
 };
 
+// --- MIDI Player Event Handlers ---
+const onMidiError = (error: any) => {
+  console.error('MIDI player error:', error);
+  reportError('MIDI playback error: ' + error.message, 'midi_playback_error', error);
+};
 
 // --- Core Algorithms & Helpers ---
 
-/**
- * Calculates the median of an array of numbers.
- */
-const median = (arr) => {
+const median = (arr: number[]) => {
   if (arr.length === 0) return 0;
   const sorted = [...arr].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
 };
 
-/**
- * Segments a pitch contour into discrete musical notes, ported from the Python implementation.
- */
-const segmentNotes = (timestamps, pitchHz, voicing, params) => {
+const segmentNotes = (
+  timestamps: Float32Array,
+  pitchHz: Float32Array,
+  voicing: boolean[],
+  params: typeof SEGMENTATION_PARAMS
+) => {
   if (timestamps.length === 0) return [];
 
   const framePeriod = timestamps.length > 1 ? timestamps[1] - timestamps[0] : 0.016;
   const notes = [];
-  let currentNoteSegment = null;
+  let currentNoteSegment: any | null = null;
   let unvoicedFramesCount = 0;
 
-  const midiContour = pitchHz.map((pitch, i) => {
+  const midiContour = Array.from(pitchHz).map((pitch, i) => {
     if (voicing[i] && pitch > 0) {
       const validPitch = Math.max(pitch, 1e-6);
       return 69 + 12 * Math.log2(validPitch / 440.0);
@@ -267,7 +355,7 @@ const segmentNotes = (timestamps, pitchHz, voicing, params) => {
           currentNoteSegment.end = t + framePeriod;
         }
       }
-    } else { // Unvoiced frame
+    } else {
       if (currentNoteSegment !== null) {
         unvoicedFramesCount++;
         const unvoicedDuration = unvoicedFramesCount * framePeriod;
@@ -315,7 +403,7 @@ const segmentNotes = (timestamps, pitchHz, voicing, params) => {
     const gap = currentNote.start - previousNote.end;
 
     if (gap <= framePeriod + epsilon && previousNote.midi_pitch === currentNote.midi_pitch) {
-      previousNote.end = currentNote.end; // Merge notes
+      previousNote.end = currentNote.end;
     } else {
       finalNotes.push(currentNote);
     }
@@ -329,39 +417,59 @@ const segmentNotes = (timestamps, pitchHz, voicing, params) => {
   }));
 };
 
-/**
- * Creates a raw MIDI file (as a Uint8Array) from note segments.
- */
-const createMidiFile = (noteSegments, { tempo = 120, velocity = 80 } = {}) => {
-  const HEADER_CHUNK_TYPE = [0x4d, 0x54, 0x68, 0x64]; // "MThd"
+const createMidiFile = (noteSegments: any[], { tempo = 120, velocity = 80 } = {}): Uint8Array => {
+  const HEADER_CHUNK_TYPE = [0x4d, 0x54, 0x68, 0x64];
   const HEADER_CHUNK_LENGTH = [0x00, 0x00, 0x00, 0x06];
-  const FORMAT_TYPE = [0x00, 0x00]; // Format 0 (single track)
+  const FORMAT_TYPE = [0x00, 0x00];
   const NUMBER_OF_TRACKS = [0x00, 0x01];
   const TICKS_PER_QUARTER_NOTE = 480;
   const TIME_DIVISION = [(TICKS_PER_QUARTER_NOTE >> 8) & 0xff, TICKS_PER_QUARTER_NOTE & 0xff];
-  const TRACK_CHUNK_TYPE = [0x4d, 0x54, 0x72, 0x6b]; // "MTrk"
+  const TRACK_CHUNK_TYPE = [0x4d, 0x54, 0x72, 0x6b];
 
-  const encodeVariableLength = (value) => {
-    let buffer = value & 0x7f;
-    while ((value >>= 7) > 0) {
-      buffer <<= 8;
-      buffer |= (value & 0x7f) | 0x80;
+  // CORRECTED: MIDI Variable Length Quantity (VLQ) Encoding
+  const encodeVariableLength = (value: number): number[] => {
+    if (value < 0) {
+      throw new Error("Cannot encode negative values in variable length quantity.");
     }
-    const bytes = [];
-    while (true) {
-      bytes.push(buffer & 0xff);
-      if (buffer & 0x80) buffer >>= 8;
-      else break;
+    if (value === 0) {
+      return [0x00];
+    }
+
+    const bytes: number[] = [];
+    const tempChunks: number[] = [];
+
+    let currentVal = value;
+    do {
+      tempChunks.push(currentVal & 0x7F);
+      currentVal >>= 7;
+    } while (currentVal > 0);
+
+    for (let i = tempChunks.length - 1; i >= 0; i--) {
+      let byte = tempChunks[i];
+      if (i > 0) {
+        byte |= 0x80;
+      }
+      bytes.push(byte);
     }
     return bytes;
   };
 
-  const secondsToTicks = (seconds) => Math.round(seconds * TICKS_PER_QUARTER_NOTE * (tempo / 60));
+  const secondsToTicks = (seconds: number): number => Math.round(seconds * TICKS_PER_QUARTER_NOTE * (tempo / 60));
 
-  const trackEvents = [];
+  const allEvents: any[] = [];
+  for (const note of noteSegments) {
+    const midiNote = Math.max(0, Math.min(127, note.pitch_midi));
+    // Note On event
+    allEvents.push({ time: note.start, type: 0x90, note: midiNote, velocity: Math.min(127, velocity) });
+    // Note Off event (velocity 0 for standard MIDI practice)
+    allEvents.push({ time: note.end, type: 0x80, note: midiNote, velocity: 0x00 });
+  }
+  allEvents.sort((a, b) => a.time - b.time); // Crucial for correct delta times and event order
+
+  const trackEvents: number[] = [];
   let lastEventTicks = 0;
 
-  // Tempo Event (microseconds per quarter note)
+  // Tempo Event (set at delta time 0 from the start of the track)
   const microSecondsPerBeat = Math.round(60000000 / tempo);
   trackEvents.push(0x00, 0xff, 0x51, 0x03,
     (microSecondsPerBeat >> 16) & 0xff,
@@ -369,48 +477,43 @@ const createMidiFile = (noteSegments, { tempo = 120, velocity = 80 } = {}) => {
     microSecondsPerBeat & 0xff
   );
 
-  const sortedNotes = [...noteSegments].sort((a, b) => a.start - b.start);
+  for (const event of allEvents) {
+    const eventTicks = secondsToTicks(event.time);
+    const deltaTicks = eventTicks - lastEventTicks;
 
-  for (const note of sortedNotes) {
-    const startTicks = secondsToTicks(note.start);
-    const endTicks = secondsToTicks(note.end);
-    const midiNote = Math.max(0, Math.min(127, note.pitch_midi));
+    trackEvents.push(...encodeVariableLength(deltaTicks));
+    trackEvents.push(event.type, event.note, event.velocity);
 
-    // Note On event
-    const onDelta = startTicks - lastEventTicks;
-    trackEvents.push(...encodeVariableLength(onDelta), 0x90, midiNote, Math.min(127, velocity));
-    lastEventTicks = startTicks;
-
-    // Note Off event
-    const offDelta = endTicks - lastEventTicks;
-    trackEvents.push(...encodeVariableLength(offDelta), 0x80, midiNote, Math.min(127, velocity));
-    lastEventTicks = endTicks;
+    lastEventTicks = eventTicks;
   }
 
-  // End of Track event
-  trackEvents.push(...encodeVariableLength(0), 0xff, 0x2f, 0x00);
+  // End of Track event (delta time 0 from last event)
+  trackEvents.push(0x00, 0xff, 0x2f, 0x00);
 
   const trackLength = trackEvents.length;
   const trackLengthBytes = [
-    (trackLength >> 24) & 0xff, (trackLength >> 16) & 0xff,
-    (trackLength >> 8) & 0xff, trackLength & 0xff
+    (trackLength >> 24) & 0xff,
+    (trackLength >> 16) & 0xff,
+    (trackLength >> 8) & 0xff,
+    trackLength & 0xff
   ];
 
   return new Uint8Array([
-    ...HEADER_CHUNK_TYPE, ...HEADER_CHUNK_LENGTH, ...FORMAT_TYPE, ...NUMBER_OF_TRACKS, ...TIME_DIVISION,
-    ...TRACK_CHUNK_TYPE, ...trackLengthBytes, ...trackEvents
+    ...HEADER_CHUNK_TYPE,
+    ...HEADER_CHUNK_LENGTH,
+    ...FORMAT_TYPE,
+    ...NUMBER_OF_TRACKS,
+    ...TIME_DIVISION,
+    ...TRACK_CHUNK_TYPE,
+    ...trackLengthBytes,
+    ...trackEvents
   ]);
 };
 
 // --- Reactive Derived Data (Computed Properties) ---
 
-/**
- * Computes a boolean array indicating if each frame is voiced based on current settings.
- * This is reactive and will update automatically if the threshold or frequency range changes.
- */
 const voicedFlags = computed(() => {
   if (!hasData.value) return [];
-  // FIX: Convert Float32Array to a standard array before mapping to ensure it returns booleans.
   return Array.from(frameData.value!.pitch_hz).map((pitch, i) => {
     const confidence = frameData.value!.confidence[i];
     return (
@@ -420,37 +523,6 @@ const voicedFlags = computed(() => {
     );
   });
 });
-
-/**
- * Computes the final note segments using the segmentation algorithm.
- * This is also reactive and depends on the raw frame data and voicedFlags.
- */
-const noteSegments = computed(() => {
-  if (!hasData.value) return [];
-  return segmentNotes(
-    frameData.value!.timestamps,
-    frameData.value!.pitch_hz,
-    voicedFlags.value,
-    SEGMENTATION_PARAMS
-  );
-});
-
-/**
- * Computes the full frame-by-frame data for JSON export.
- * This combines the raw data with the calculated `is_voiced` status.
- */
-const processedFrameData = computed(() => {
-  if (!hasData.value) return [];
-  // FIX: Convert Float32Array to a standard array before mapping to ensure it returns objects.
-  return Array.from(frameData.value!.timestamps).map((timestamp, i) => ({
-    timestamp: parseFloat(timestamp.toFixed(4)),
-    pitch_hz: parseFloat(frameData.value!.pitch_hz[i].toFixed(2)),
-    confidence: parseFloat(frameData.value!.confidence[i].toFixed(4)),
-    is_voiced: voicedFlags.value[i],
-  }));
-});
-
-// -----------------------------------------------------
 
 /* ---------- chart configuration ---------- */
 const chartData = ref<ChartData<'line'>>({
@@ -549,25 +621,24 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
     }
   }
 }))
-
 /* ---------- centralized error reporting ---------- */
 function reportError(message: string, location: string, err: any = null) {
   error.value = message;
   errorLocation.value = location;
-  // console.error for internal debugging
   if (err) {
     console.error(`Error at ${location}:`, err);
   } else {
     console.error(`Error at ${location}: ${message}`);
   }
-  // Clear data related to the failed operation
   frameData.value = null;
   processedAudioLength.value = null;
   processedFileSizeBytes.value = null;
   processedFileName.value = null;
+  noteSegments.value = [];
+  processedFrameData.value = [];
+  processingSource.value = null; // --- CORRECTED/ADDED LINE ---
 }
 
-/* ---------- improved error message generation ---------- */
 function getDetailedErrorMessage(err: any): string {
   if (err instanceof DOMException) {
     if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
@@ -582,7 +653,6 @@ function getDetailedErrorMessage(err: any): string {
     if (err.name === 'OverconstrainedError') {
       return 'Microphone constraints could not be satisfied. Your microphone might not support the requested sample rate (16kHz).';
     }
-    // For MediaRecorder specific DOMExceptions
     if (err.name === 'InvalidStateError') {
       return 'Recording state error. The recorder might be in an unexpected state. Try refreshing.';
     }
@@ -622,38 +692,42 @@ function getDetailedErrorMessage(err: any): string {
 async function handleAudioBuffer(audioBuffer: ArrayBuffer, sourceFileName: string | null = null) {
   if (!onnxService) {
     reportError('ONNX service not initialized. Model might not have loaded correctly.', 'audio_processing_init_error');
+    isProcessing.value = false; // --- CORRECTED/ADDED LINE ---
     return
   }
 
-  // Check file size
   if (audioBuffer.byteLength > MAX_FILE_SIZE_BYTES) {
     reportError(
       `File too large (${(audioBuffer.byteLength / 1024 / 1024).toFixed(2)}MB). Maximum size is ${maxFileSizeMB.value}MB.`,
       'file_size_limit'
     )
+    isProcessing.value = false; // --- CORRECTED/ADDED LINE ---
     return
   }
 
-  isProcessing.value = true
-  error.value = null // Clear previous errors
+  // isProcessing.value = true // --- REMOVED (set by calling function) ---
+  error.value = null
   errorLocation.value = null
+  midiBuffer.value = null;
+  midiInfo.value = null;
+  noteSegments.value = [];
+  processedFrameData.value = [];
 
   try {
     const audioCtx = new AudioContext({ sampleRate: SAMPLE_RATE })
     const decoded = await audioCtx.decodeAudioData(audioBuffer)
 
-    // Check duration
     if (decoded.duration > MAX_AUDIO_DURATION_SECONDS) {
       reportError(
         `Audio too long (${decoded.duration.toFixed(1)}s). Maximum duration is ${MAX_AUDIO_DURATION_SECONDS}s (${maxAudioDurationMinutes.value} minutes).`,
         'audio_duration_limit'
       )
+      isProcessing.value = false; // --- CORRECTED/ADDED LINE ---
       return
     }
 
     const raw = decoded.getChannelData(0)
 
-    // FIXED NORMALIZATION: Replace spread operator with efficient loop to prevent stack overflow
     let max = 0;
     for (let i = 0; i < raw.length; i++) {
       const absVal = Math.abs(raw[i]);
@@ -664,12 +738,9 @@ async function handleAudioBuffer(audioBuffer: ArrayBuffer, sourceFileName: strin
       for (let i = 0; i < raw.length; i++) {
         normalized[i] = raw[i] / max;
       }
-    } else {
-      // If max is 0 (e.g., silence), normalized remains all zeros, which is correct
     }
 
-
-    const result = await onnxService.runInference({
+    const result = await onnxService!.runInference({
       input_audio: Array.from(normalized)
     })
 
@@ -683,10 +754,27 @@ async function handleAudioBuffer(audioBuffer: ArrayBuffer, sourceFileName: strin
     processedFileSizeBytes.value = audioBuffer.byteLength;
     processedFileName.value = sourceFileName || `processed_audio_${new Date().toISOString().replace(/[:.]/g, '-')}.data`;
 
-  } catch (err) {
+    processedFrameData.value = Array.from(frameData.value!.timestamps).map((timestamp, i) => ({
+      timestamp: parseFloat(timestamp.toFixed(4)),
+      pitch_hz: parseFloat(frameData.value!.pitch_hz[i].toFixed(2)),
+      confidence: parseFloat(frameData.value!.confidence[i].toFixed(4)),
+      is_voiced: voicedFlags.value[i],
+    }));
+
+    noteSegments.value = segmentNotes(
+      frameData.value!.timestamps,
+      frameData.value!.pitch_hz,
+      voicedFlags.value,
+      SEGMENTATION_PARAMS
+    );
+
+  } catch (err: any) {
     reportError(getDetailedErrorMessage(err), 'audio_processing', err)
+    noteSegments.value = [];
+    processedFrameData.value = [];
   } finally {
-    isProcessing.value = false // Ensure processing state is always reset
+    isProcessing.value = false
+    processingSource.value = null; // --- CORRECTED/ADDED LINE ---
   }
 }
 
@@ -697,13 +785,17 @@ const recordAudio = async () => {
     return;
   }
 
-  error.value = null // Clear previous errors
+  error.value = null
   errorLocation.value = null
-  frameData.value = null // Clear data immediately on new recording attempt
-  processedAudioLength.value = null; // Reset
-  processedFileSizeBytes.value = null; // Reset
-  processedFileName.value = null; // Reset
-  processedFileName.value = `recorded_audio_${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
+  frameData.value = null
+  processedAudioLength.value = null;
+  processedFileSizeBytes.value = null;
+  processedFileName.value = null;
+
+  midiBuffer.value = null;
+  midiInfo.value = null;
+  noteSegments.value = [];
+  processedFrameData.value = [];
 
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -716,6 +808,7 @@ const recordAudio = async () => {
     })
 
     isRecording.value = true
+    processingSource.value = null // --- CORRECTED/ADDED LINE ---
     recordingStartTime = Date.now()
     const chunks: Blob[] = []
 
@@ -728,48 +821,55 @@ const recordAudio = async () => {
     }
 
     recorder.onstop = async () => {
-      isRecording.value = false // Set recording to false immediately after stop event
-      stream.getTracks().forEach(track => track.stop()) // Stop all tracks from the stream
+      isRecording.value = false
+      stream.getTracks().forEach(track => track.stop())
+
+      isProcessing.value = true;   // --- CORRECTED/ADDED LINE ---
+      processingSource.value = 'record'; // --- CORRECTED/ADDED LINE ---
 
       if (chunks.length > 0) {
         const blob = new Blob(chunks, { type: 'audio/webm' })
-        await handleAudioBuffer(await blob.arrayBuffer(), processedFileName.value || 'recorded_audio.webm')
+        processedFileName.value = `recorded_audio_${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
+        await handleAudioBuffer(await blob.arrayBuffer(), processedFileName.value)
       } else {
         reportError('No audio data recorded. Please ensure your microphone is working and record for a longer duration.', 'recording_no_data');
+        isProcessing.value = false;   // --- CORRECTED/ADDED LINE ---
+        processingSource.value = null; // --- CORRECTED/ADDED LINE ---
       }
-      recorder = null; // Clean up recorder instance
+      recorder = null;
     }
 
     recorder.onerror = (event) => {
-      // Accessing event.error for MediaRecorder errors
       const err = event.error || new Error("Unknown MediaRecorder error");
       reportError(getDetailedErrorMessage(err), 'recording_error', err);
-      isRecording.value = false; // Ensure state is reset on error
-      stream.getTracks().forEach(track => track.stop()); // Stop tracks on error
-      recorder = null; // Clean up recorder instance
+      isRecording.value = false;
+      stream.getTracks().forEach(track => track.stop());
+      recorder = null;
+      isProcessing.value = false;   // --- CORRECTED/ADDED LINE ---
+      processingSource.value = null; // --- CORRECTED/ADDED LINE ---
     };
 
-    recorder.start(100) // Collect data every 100ms
+    recorder.start(100)
 
   } catch (err) {
     reportError(getDetailedErrorMessage(err), 'microphone_access', err)
-    isRecording.value = false // Ensure recording state is reset on error
+    isRecording.value = false
     if (recorder && recorder.state !== 'inactive') {
-      recorder.stop(); // Attempt to stop if it somehow started
+      recorder.stop();
     }
+    isProcessing.value = false;   // --- CORRECTED/ADDED LINE ---
+    processingSource.value = null; // --- CORRECTED/ADDED LINE ---
   }
 }
 
 const stopRecording = () => {
   if (recorder && recorder.state !== 'inactive') {
     recorder.stop()
+    // processingSource.value = 'record' // --- REMOVED (moved to recorder.onstop) ---
   } else {
     console.warn("Attempted to stop recording when recorder was not active.");
-    // If for some reason recorder.state is 'inactive' but isRecording is true (desync)
-    if (isRecording.value) {
-      isRecording.value = false; // Force reset UI state
-      reportError('Recording stopped unexpectedly or was already inactive.', 'recording_state_desync');
-    }
+    isRecording.value = false;
+    processingSource.value = null
   }
 }
 
@@ -781,21 +881,30 @@ const uploadAudioFile = () => {
   input.onchange = async (e) => {
     const file = (e.target as HTMLInputElement).files?.[0]
     if (file) {
-      error.value = null // Clear previous errors
+      error.value = null
       errorLocation.value = null
-      frameData.value = null // Clear data immediately on new upload attempt
-      processedAudioLength.value = null; // Reset
-      processedFileSizeBytes.value = null; // Reset
-      processedFileName.value = null; // Reset
-      isProcessing.value = true // Set processing state immediately for upload
+      frameData.value = null
+      processedAudioLength.value = null;
+      processedFileSizeBytes.value = null;
+      processedFileName.value = file.name;
+
+      midiBuffer.value = null;
+      midiInfo.value = null;
+      noteSegments.value = [];
+      processedFrameData.value = [];
+
+      isProcessing.value = true
+      processingSource.value = 'upload'; // --- CORRECTED/ADDED LINE ---
       try {
         const arrayBuffer = await file.arrayBuffer()
-        processedFileName.value = file.name; // Set file name here for uploaded files
         await handleAudioBuffer(arrayBuffer, file.name)
       } catch (err) {
         reportError(getDetailedErrorMessage(err), 'file_upload', err)
+        noteSegments.value = [];
+        processedFrameData.value = [];
       } finally {
-        isProcessing.value = false // ENSURE isProcessing is reset here!
+        isProcessing.value = false
+        processingSource.value = null // --- CORRECTED/ADDED LINE ---
       }
     }
   }
@@ -811,12 +920,10 @@ const updateThreshold = (e: Event) => {
 onMounted(async () => {
   try {
     if (!onnxService) {
-      // Start timer when model loading begins
       isLoadingModel.value = true;
       modelLoadStartTime.value = Date.now();
       elapsedLoadTime.value = 0;
 
-      // NEW: Show extended message after 3 seconds
       extendedMessageTimeout = setTimeout(() => {
         showExtendedLoadingMessage.value = true;
       }, 3000);
@@ -830,12 +937,11 @@ onMounted(async () => {
       onnxService = new ONNXService('model.onnx')
       await onnxService.initializeSession()
 
-      // Stop and clear timer when model loading ends
       if (loadTimerInterval) {
         clearInterval(loadTimerInterval);
         loadTimerInterval = null;
       }
-      if (extendedMessageTimeout) { // NEW: Clear timeout if model loaded quickly
+      if (extendedMessageTimeout) {
         clearTimeout(extendedMessageTimeout);
         extendedMessageTimeout = null;
       }
@@ -843,14 +949,14 @@ onMounted(async () => {
       elapsedLoadTime.value = 0;
       isLoadingModel.value = false
     }
-  } catch (err) {
+  } catch (err: any) {
     reportError(getDetailedErrorMessage(err), 'model_loading', err)
     isLoadingModel.value = false;
     if (loadTimerInterval) {
       clearInterval(loadTimerInterval);
       loadTimerInterval = null;
     }
-    if (extendedMessageTimeout) { // NEW: Clear timeout on error
+    if (extendedMessageTimeout) {
       clearTimeout(extendedMessageTimeout);
       extendedMessageTimeout = null;
     }
@@ -862,9 +968,11 @@ onMounted(async () => {
 onUnmounted(() => {
   if (loadTimerInterval) {
     clearInterval(loadTimerInterval);
+    loadTimerInterval = null;
   }
   if (extendedMessageTimeout) {
     clearTimeout(extendedMessageTimeout);
+    extendedMessageTimeout = null;
   }
 });
 
@@ -875,14 +983,13 @@ watch(frameData, (newData) => {
     return
   }
 
-  const points: { x: number; y: number | null; confidence: number }[] = [] // y can now be null
+  const points: { x: number; y: number | null; confidence: number }[] = []
 
   for (let i = 0; i < newData.pitch_hz.length; i++) {
     const conf = newData.confidence[i]
     const pitch = newData.pitch_hz[i]
     const time = newData.timestamps[i]
 
-    // Check if the point is "voiced" based on threshold and frequency range
     if (
       conf > threshold.value &&
       pitch >= frequencyRange.value[0] &&
@@ -890,7 +997,6 @@ watch(frameData, (newData) => {
     ) {
       points.push({ x: time, y: pitch, confidence: conf })
     } else {
-      // If unvoiced, push a null value for 'y' to create a gap in the line
       points.push({ x: time, y: null, confidence: conf })
     }
   }
@@ -899,251 +1005,502 @@ watch(frameData, (newData) => {
     datasets: [{
       ...chartData.value.datasets[0],
       data: points,
-      spanGaps: false // Explicitly set to false (it's the default, but good for clarity)
+      spanGaps: false
     }]
   }
 })
 
-/* Refresh chart when parameters change */
+/* Refresh chart and auto-update MIDI when parameters change */
 watch([frequencyRange, threshold], () => {
   if (frameData.value) {
     // Trigger reactivity by creating new reference
     frameData.value = { ...frameData.value }
+
+    // Auto-update note segments and MIDI when parameters change
+    noteSegments.value = segmentNotes(
+      frameData.value.timestamps,
+      frameData.value.pitch_hz,
+      voicedFlags.value,
+      SEGMENTATION_PARAMS
+    );
   }
 }, { deep: true })
+
+/* Auto-generate MIDI when note segments change */
+watch(noteSegments, (newSegments) => {
+  if (newSegments && newSegments.length > 0) {
+    generateMidiForPlayer();
+  } else {
+    midiInfo.value = null;
+    midiBuffer.value = null;
+  }
+}, { deep: true, immediate: true });
 </script>
-
 <template>
-  <main class="min-h-screen bg-[#131712] font-['Manrope','Noto_Sans',sans-serif]">
-    <div class="container mx-auto px-4 sm:px-6 lg:px-8 xl:px-16 2xl:px-40 py-6 max-w-7xl">
+  <main class="min-h-screen bg-[#131712] font-['Manrope','Noto_Sans',sans-serif] text-white">
+    <div class="container mx-auto px-4 sm:px-6 lg:px-8 xl:px-16 2xl:px-40 py-8 max-w-7xl">
 
-      <div class="mb-8">
-        <h1 class="text-white text-2xl sm:text-3xl lg:text-4xl font-bold leading-tight mb-3">
+      <header class="mb-10 text-center lg:text-left">
+        <h1 class="text-5xl sm:text-6xl lg:text-7xl font-bold leading-tight mb-4 text-[#53d22c]">
           SwiftF0
         </h1>
-        <p class="text-white/80 text-sm sm:text-base leading-relaxed mb-4">
-          Analyze pitch from audio or files. Adjust frequency range to improve accuracy: typical human voices fall
-          between <strong>80–300 Hz</strong>. For instruments, middle C is <strong>261.6 Hz</strong>, low guitar E is
-          <strong>82.4 Hz</strong>. Confidence threshold ranges from 0–100%; around <strong>90%</strong> works best in
-          clean recordings. Narrowing the frequency range and tuning confidence can reduce noise and improve detection.
+        <p class="text-white/80 text-lg sm:text-xl leading-relaxed max-w-4xl mx-auto lg:mx-0 mb-6">
+          Turn monophonic audio into MIDI. Visualize pitch and adjust settings to improve results.
+          Designed for single-note recordings like vocals or solo instruments, not chords or polyphonic music.
         </p>
-
-        <div class="flex flex-wrap gap-3 text-sm">
+        <div class="flex flex-wrap justify-center lg:justify-start gap-4 text-sm">
           <a href="https://github.com/lars76/swift-f0" target="_blank" rel="noopener noreferrer"
-            class="inline-flex items-center gap-2 px-3 py-1.5 bg-[#1a1f17] border border-[#2d372a] rounded-lg text-white/80 hover:text-white hover:border-[#53d22c] transition-all duration-200">
-            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+            class="inline-flex items-center gap-2 px-4 py-2 bg-[#1a1f17] border border-[#2d372a] rounded-lg text-white/70 hover:text-white hover:border-[#53d22c] transition-all duration-200 group shadow-md"
+            title="View SwiftF0 source code on GitHub (opens in new tab)">
+            <svg class="w-5 h-5 group-hover:scale-110 transition-transform duration-200" fill="currentColor"
+              viewBox="0 0 24 24">
               <path
                 d="M12,2A10,10 0 0,0 2,12C2,16.42 4.87,20.17 8.84,21.5C9.34,21.58 9.5,21.27 9.5,21C9.5,20.77 9.5,20.14 9.5,19.31C6.73,19.91 6.14,17.97 6.14,17.97C5.68,16.81 5.03,16.5 5.03,16.5C4.12,15.88 5.1,15.9 5.1,15.9C6.1,15.97 6.63,16.93 6.63,16.93C7.5,18.45 8.97,18 9.54,17.76C9.63,17.11 9.89,16.67 10.17,16.42C7.95,16.17 5.62,15.31 5.62,11.5C5.62,10.39 6,9.5 6.65,8.79C6.55,8.54 6.2,7.5 6.75,6.15C6.75,6.15 7.59,5.88 9.5,7.17C10.29,6.95 11.15,6.84 12,6.84C12.85,6.84 13.71,6.95 14.5,7.17C16.41,5.88 17.25,6.15 17.25,6.15C17.8,7.5 17.45,8.54 17.35,8.79C18,9.5 18.38,10.39 18.38,11.5C18.38,15.32 16.04,16.16 13.81,16.41C14.17,16.72 14.5,17.33 14.5,18.26C14.5,19.6 14.5,20.68 14.5,21C14.5,21.27 14.66,21.59 15.17,21.5C19.14,20.16 22,16.42 22,12A10,10 0 0,0 12,2Z" />
             </svg>
             Source Code
           </a>
         </div>
-      </div>
+      </header>
 
-      <section class="mb-8">
-        <h2 class="text-white text-lg sm:text-xl font-bold mb-4">Audio Input</h2>
-        <div v-if="isLoadingModel"
-          class="p-4 bg-[#1a1f17] rounded-lg border border-[#2d372a] text-white/80 flex items-center justify-center">
-          <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none"
-            viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-            </path>
-          </svg>
-          <span>
-            <template v-if="!showExtendedLoadingMessage">
-              Loading AI Model...
-            </template>
-            <template v-else>
-              Still loading, almost there... {{ elapsedLoadTime }} seconds
-            </template>
-          </span>
-        </div>
-        <div v-else class="flex flex-col sm:flex-row gap-3">
-          <button @click="isRecording ? stopRecording() : recordAudio()" :disabled="isProcessing" :class="[
-            'w-full sm:w-auto min-w-[140px] h-11 px-6 rounded-lg font-bold text-sm transition-all duration-200',
-            isRecording
-              ? 'bg-red-500 hover:bg-red-600 text-white'
-              : 'bg-[#53d22c] hover:bg-[#4bc228] text-[#131712]',
-            'disabled:opacity-50 disabled:cursor-not-allowed'
-          ]">
-            {{ recordButtonText }}
+      <section v-if="isLoadingModel"
+        class="mb-10 bg-[#1a1f17] rounded-xl p-8 border border-[#2d372a] shadow-xl flex flex-col items-center justify-center h-[200px] sm:h-[220px] text-white/70 animate-pulse-fade"
+        aria-live="polite" aria-atomic="true">
+        <div class="w-16 h-16 border-4 border-[#2d372a] border-t-white rounded-full animate-spin mb-4" role="status"
+          aria-label="Loading"></div>
+        <span class="font-bold text-2xl mb-2">
+          <template v-if="!showExtendedLoadingMessage">
+            Loading AI Model...
+          </template>
+          <template v-else>
+            Still loading, almost there... {{ elapsedLoadTime }}s
+          </template>
+        </span>
+        <p class="text-base text-white/60">This may take a moment, especially on first visit.</p>
+      </section>
+
+      <section v-else class="mb-10 bg-[#1a1f17] rounded-xl p-8 border border-[#2d372a] shadow-xl">
+        <h2 class="text-3xl font-bold mb-6 text-[#53d22c]">Audio Input</h2>
+
+        <div class="flex flex-col sm:flex-row gap-4 mb-4">
+          <button @click="isRecording ? stopRecording() : recordAudio()"
+            :disabled="isProcessing && processingSource === 'upload'" :class="[
+              'w-full sm:flex-1 flex items-center justify-center gap-3 h-14 px-6 rounded-xl font-bold text-lg transition-all duration-200 shadow-md',
+              isRecording
+                ? 'bg-red-600 hover:bg-red-700 text-white animate-pulse'
+                : 'bg-[#53d22c] hover:bg-[#4bc228] text-[#131712]',
+              'disabled:opacity-50 disabled:cursor-not-allowed'
+            ]" :title="isRecording ? 'Stop Recording' : 'Start Recording Audio'"
+            :aria-label="isRecording ? 'Stop Recording' : 'Record Audio'">
+            <svg v-if="!isRecording" class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.2-3c0 3.53-2.64 6.4-6.2 6.73V21h3v2H8v-2h3v-3.27c-3.56-.33-6.2-3.2-6.2-6.73H3c0 4.42 3.58 8 8 8v3h2v-3c4.42 0 8-3.58 8-8h-2z" />
+            </svg>
+            <svg v-else class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+            </svg>
+            <template v-if="isRecording">Stop Recording</template>
+            <template v-else-if="isProcessing && processingSource === 'record'">Processing...</template>
+            <template v-else>Record Audio</template>
           </button>
 
-          <button @click="uploadAudioFile" :disabled="isProcessing || isRecording"
-            class="w-full sm:w-auto min-w-[140px] h-11 px-6 rounded-lg bg-[#2d372a] hover:bg-[#3d473a] text-white font-bold text-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
-            {{ isProcessing && !isRecording ? 'Processing...' : 'Upload File' }}
+          <button @click="uploadAudioFile" :disabled="isRecording || (isProcessing && processingSource === 'upload')"
+            :class="[
+              'w-full sm:flex-1 flex items-center justify-center gap-3 h-14 px-6 rounded-xl font-bold text-lg transition-all duration-200 shadow-md',
+              isProcessing && processingSource === 'upload' ? 'bg-[#3d473a] text-white/70 animate-pulse' : 'bg-[#2d372a] hover:bg-[#3d473a] text-white',
+              'disabled:opacity-50 disabled:cursor-not-allowed'
+            ]" title="Upload an audio file from your device" aria-label="Upload Audio File">
+            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
+            </svg>
+            <template v-if="isProcessing && processingSource === 'upload'">Processing...</template>
+            <template v-else>Upload File</template>
           </button>
         </div>
 
-        <div class="mt-3 text-xs text-white/60">
-          Maximum file size: {{ maxFileSizeMB }}MB • Maximum duration: {{ maxAudioDurationMinutes }} minutes
-        </div>
-
-        <div v-if="error" class="mt-4 p-4 bg-red-900/20 border border-red-700/50 rounded-lg">
-          <p class="text-red-400 text-sm flex items-start gap-2">
-            <svg class="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+        <div class="mt-4 text-center sm:text-left" role="status" aria-live="polite">
+          <p v-if="error"
+            class="text-red-400 text-sm flex items-start gap-2 p-2 bg-red-900/20 border border-red-700/50 rounded-lg animate-fade-in">
+            <svg class="w-5 h-5 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
               <path fill-rule="evenodd"
                 d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
                 clip-rule="evenodd" />
             </svg>
             <span>
               <template v-if="errorLocation">
-                **{{ errorLocation.replace(/_/g, ' ').toUpperCase() }} ERROR:**
+                <strong class="uppercase">{{ errorLocation.replace(/_/g, ' ') }} ERROR:</strong>
               </template>
               {{ error }}
             </span>
           </p>
+          <p v-else class="text-sm text-white/60">
+            Max file size: <span class="font-semibold">{{ maxFileSizeMB }}MB</span> •
+            Max duration: <span class="font-semibold">{{ maxAudioDurationMinutes }} minutes</span>
+          </p>
         </div>
       </section>
 
-      <section class="mb-8">
-        <h2 class="text-white text-lg sm:text-xl font-bold mb-4">Parameters</h2>
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <section class="mb-10 bg-[#1a1f17] rounded-xl p-8 border border-[#2d372a] shadow-xl">
+        <h2 class="text-3xl font-bold mb-6 text-[#53d22c]">Analysis Parameters</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
 
-          <div class="bg-[#1a1f17] rounded-lg p-4 border border-[#2d372a]">
-            <div class="flex items-center justify-between mb-4">
-              <label class="text-white text-base font-medium">Confidence Threshold</label>
-              <span class="text-white text-sm bg-[#2d372a] px-2 py-1 rounded">
+          <div class="bg-[#131712] rounded-lg p-6 border border-[#2d372a]">
+            <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+              <label for="confidence-threshold" class="text-white text-base font-semibold flex-shrink-0">
+                Confidence Threshold
+              </label>
+              <span
+                class="text-white bg-[#2d372a] px-2 py-1 rounded-md font-mono text-center flex-grow-0 flex-shrink-0 overflow-hidden min-w-0 text-xs"
+                aria-live="polite" aria-atomic="true">
                 {{ Math.round(threshold * 100) }}%
               </span>
             </div>
-            <div class="relative">
-              <div class="h-1 bg-[#42513e] rounded-full">
+            <div class="relative flex items-center h-10 mb-4">
+              <div class="h-2 bg-[#2d372a] rounded-full w-full absolute">
                 <div class="h-full bg-white rounded-full transition-all duration-150"
                   :style="{ width: `${threshold * 100}%` }"></div>
               </div>
               <input type="range" min="0" max="1" step="0.01" :value="threshold" @input="updateThreshold"
-                class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
-              <div class="absolute -top-1.5 w-4 h-4 bg-white rounded-full transition-all duration-150"
-                :style="{ left: `calc(${threshold * 100}% - 8px)` }"></div>
+                id="confidence-threshold"
+                class="relative z-10 w-full h-full appearance-none bg-transparent cursor-pointer slider-thumb"
+                :aria-valuenow="Math.round(threshold * 100)" aria-valuemin="0" aria-valuemax="100"
+                aria-label="Confidence Threshold Slider"
+                title="Adjust the minimum confidence level for pitch detection.">
             </div>
+            <p class="text-white/70 text-sm leading-relaxed">
+              Defines the minimum confidence level. Higher values reduce noise but might miss pitches.
+              Lower values detect more but can include errors. 90% is a good starting point.
+            </p>
           </div>
 
-          <div class="bg-[#1a1f17] rounded-lg p-4 border border-[#2d372a]">
-            <div class="flex items-center justify-between mb-4">
-              <label class="text-white text-base font-medium">Frequency Range</label>
+          <div class="bg-[#131712] rounded-lg p-6 border border-[#2d372a]">
+            <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+              <label class="text-white text-base font-semibold flex-shrink-0">Frequency Range</label>
+              <span
+                class="text-white bg-[#2d372a] px-2 py-1 rounded-md font-mono text-center flex-grow-0 flex-shrink-0 overflow-hidden min-w-0 text-xs"
+                aria-live="polite" aria-atomic="true">
+                {{ Math.round(frequencyRange[0]) }} Hz – {{ Math.round(frequencyRange[1]) }} Hz
+              </span>
             </div>
-            <div class="space-y-3">
+            <div class="relative h-10 mb-4 flex items-center">
               <Slider v-model="frequencyRange" :min="FREQ_MIN" :max="FREQ_MAX" :step="1" :tooltips="false"
-                class="slider-custom" />
-              <div class="flex justify-between text-white text-sm font-mono">
-                <span>{{ Math.round(frequencyRange[0]) }} Hz</span>
-                <span>{{ Math.round(frequencyRange[1]) }} Hz</span>
+                class="slider-custom w-full" aria-label="Frequency Range Slider"
+                :aria-valuetext="`Min: ${Math.round(frequencyRange[0])} Hz, Max: ${Math.round(frequencyRange[1])} Hz`"
+                title="Set the minimum and maximum frequencies for pitch detection.">
+              </Slider>
+            </div>
+            <p class="text-white/70 text-sm leading-relaxed">
+              Set the frequency range to match your audio. Narrowing it can improve accuracy by reducing background
+              noise.
+              Voice is typically 80–300 Hz, instruments 60–2000 Hz.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section v-if="hasData" class="mb-10 bg-[#1a1f17] rounded-xl p-8 border border-[#2d372a] shadow-xl">
+        <h2 class="text-3xl font-bold mb-6 text-[#53d22c]">Analysis Results</h2>
+
+        <div class="mb-10 bg-[#131712] rounded-xl p-6 border border-[#2d372a]">
+          <h3 class="text-xl font-bold mb-4 text-white/90">Pitch Visualization</h3>
+          <div class="h-64 sm:h-80 lg:h-96 w-full" role="img"
+            aria-label="Pitch visualization chart showing detected frequencies over time.">
+            <Line :data="chartData" :options="chartOptions" class="pitch-chart h-full" />
+          </div>
+        </div>
+
+        <div v-if="hasPlayableNotes" class="mb-10 bg-[#131712] rounded-xl p-6 border border-[#2d372a]">
+          <h3 class="text-xl font-bold mb-4 text-white/90">MIDI Playback</h3>
+          <MidiPlayer :notes="noteSegments" :auto-play="false" @error="onMidiError" :accent-color="'#2d372a'"
+            aria-label="MIDI playback controls for the detected notes." />
+        </div>
+
+        <div class="mb-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div class="bg-[#131712] rounded-xl p-6 border border-[#2d372a]">
+            <h3 class="text-xl font-bold mb-6 text-white/90">Pitch Statistics</h3>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-4">
+              <div class="stat-item">
+                <span class="stat-label">Frames</span>
+                <span class="stat-value">
+                  {{ displayPitchStats.count !== null ? displayPitchStats.count : '−' }}
+                </span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">Average Freq</span>
+                <span class="stat-value">
+                  {{ displayPitchStats.average ? displayPitchStats.average.toFixed(1) + ' Hz' : '−' }}
+                </span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">Median Freq</span>
+                <span class="stat-value">
+                  {{ displayPitchStats.median ? displayPitchStats.median.toFixed(1) + ' Hz' : '−' }}
+                </span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">Freq Range</span>
+                <span class="stat-value">
+                  {{ displayPitchStats.max !== null && displayPitchStats.min !== null
+                    ? (displayPitchStats.max - displayPitchStats.min).toFixed(1) + ' Hz'
+                    : '−' }}
+                </span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">Min Freq</span>
+                <span class="stat-value">
+                  {{ displayPitchStats.min ? displayPitchStats.min.toFixed(1) + ' Hz' : '−' }}
+                </span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">Max Freq</span>
+                <span class="stat-value">
+                  {{ displayPitchStats.max ? displayPitchStats.max.toFixed(1) + ' Hz' : '−' }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-[#131712] rounded-xl p-6 border border-[#2d372a]">
+            <h3 class="text-xl font-bold mb-6 text-white/90">MIDI Statistics</h3>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-4">
+              <div class="stat-item">
+                <span class="stat-label">Notes</span>
+                <span class="stat-value">
+                  {{ displayMidiStats.count !== null ? displayMidiStats.count : '−' }}
+                </span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">Average Note</span>
+                <span class="stat-value">
+                  {{ displayMidiStats.average ? midiToNoteName(Math.round(displayMidiStats.average)) : '−' }}
+                </span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">Median Note</span>
+                <span class="stat-value">
+                  {{ displayMidiStats.median ? midiToNoteName(displayMidiStats.median) : '−' }}
+                </span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">Note Range</span>
+                <span class="stat-value">
+                  {{ displayMidiStats.range !== null ? displayMidiStats.range + ' semitones' : '−' }}
+                </span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">Lowest Note</span>
+                <span class="stat-value">
+                  {{ displayMidiStats.min ? midiToNoteName(displayMidiStats.min) : '−' }}
+                </span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">Highest Note</span>
+                <span class="stat-value">
+                  {{ displayMidiStats.max ? midiToNoteName(displayMidiStats.max) : '−' }}
+                </span>
               </div>
             </div>
           </div>
         </div>
-      </section>
 
-      <section class="mb-8">
-        <h2 class="text-white text-lg sm:text-xl font-bold mb-4">Statistics</h2>
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-          <div class="bg-[#1a1f17] rounded-lg p-4 border border-[#2d372a]">
-            <div class="text-[#a5b6a0] text-xs uppercase tracking-wide mb-1">Points</div>
-            <div class="text-white text-lg font-bold">
-              {{ displayStats.count !== null ? displayStats.count : '-' }}
-            </div>
-          </div>
-          <div class="bg-[#1a1f17] rounded-lg p-4 border border-[#2d372a]">
-            <div class="text-[#a5b6a0] text-xs uppercase tracking-wide mb-1">Average</div>
-            <div class="text-white text-lg font-bold">
-              {{ displayStats.average ? displayStats.average.toFixed(1) + 'Hz' : '-' }}
-            </div>
-          </div>
-          <div class="bg-[#1a1f17] rounded-lg p-4 border border-[#2d372a]">
-            <div class="text-[#a5b6a0] text-xs uppercase tracking-wide mb-1">Median</div>
-            <div class="text-white text-lg font-bold">
-              {{ displayStats.median ? displayStats.median.toFixed(1) + 'Hz' : '-' }}
-            </div>
-          </div>
-          <div class="bg-[#1a1f17] rounded-lg p-4 border border-[#2d372a]">
-            <div class="text-[#a5b6a0] text-xs uppercase tracking-wide mb-1">Range</div>
-            <div class="text-white text-lg font-bold">
-              {{ displayStats.min !== null && displayStats.max !== null
-                ? (displayStats.max - displayStats.min).toFixed(1) + 'Hz'
-                : '-' }}
-            </div>
-          </div>
-          <div class="bg-[#1a1f17] rounded-lg p-4 border border-[#2d372a]">
-            <div class="text-[#a5b6a0] text-xs uppercase tracking-wide mb-1">Min</div>
-            <div class="text-white text-lg font-bold">
-              {{ displayStats.min ? displayStats.min.toFixed(1) + 'Hz' : '-' }}
-            </div>
-          </div>
-          <div class="bg-[#1a1f17] rounded-lg p-4 border border-[#2d372a]">
-            <div class="text-[#a5b6a0] text-xs uppercase tracking-wide mb-1">Max</div>
-            <div class="text-white text-lg font-bold">
-              {{ displayStats.max ? displayStats.max.toFixed(1) + 'Hz' : '-' }}
-            </div>
+        <div class="bg-[#131712] rounded-xl p-6 border border-[#2d372a]">
+          <h3 class="text-xl font-bold mb-4 text-white/90">Export Options</h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <button @click="downloadData" :disabled="!hasData" class="export-btn"
+              title="Download the raw pitch detection data as a JSON file." aria-label="Export Pitch Data (JSON)">
+              <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                <path fill-rule="evenodd"
+                  d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
+                  clip-rule="evenodd" />
+              </svg>
+              Export Pitch Data <span class="hidden md:inline">(JSON)</span>
+            </button>
+            <button @click="downloadMidi" :disabled="!hasData || isProcessing || !hasPlayableNotes" class="export-btn"
+              title="Download the detected notes as a MIDI file." aria-label="Export MIDI File">
+              <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                <path
+                  d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 1.343-3 3s1.343 3 3 3 3-1.343 3-3V7.82l8-1.6v5.894A4.370 4.370 0 0015 12c-1.657 0-3 1.343-3 3s1.343 3 3 3 3-1.343 3-3V3z" />
+              </svg>
+              Export MIDI File
+            </button>
           </div>
         </div>
       </section>
 
-      <section class="mb-8">
-        <h2 class="text-white text-lg sm:text-xl font-bold mb-4">Visualization</h2>
-        <div class="bg-[#1a1f17] rounded-lg border border-[#2d372a] p-6">
-          <div class="h-64 sm:h-80 lg:h-96">
-            <div v-if="hasData" class="h-full">
-              <Line :data="chartData" :options="chartOptions" class="pitch-chart h-full" />
-            </div>
-            <div v-else class="h-full flex items-center justify-center">
-              <div class="text-center">
-                <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-[#2d372a] flex items-center justify-center">
-                  <svg class="w-8 h-8 text-[#a5b6a0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l6 6-6 6z" />
-                  </svg>
-                </div>
-                <h3 class="text-white text-lg font-bold mb-2">No Data Available</h3>
-                <p class="text-[#a5b6a0] text-sm">Record or upload audio to begin pitch detection</p>
-              </div>
-            </div>
-          </div>
+      <section v-else
+        class="bg-[#1a1f17] rounded-xl p-10 border border-[#2d372a] shadow-xl text-center min-h-[300px] flex flex-col items-center justify-center"
+        aria-live="polite">
+        <div class="w-20 h-20 mx-auto mb-6 rounded-full bg-[#2d372a] flex items-center justify-center">
+          <svg class="w-10 h-10 text-[#a5b6a0]" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l6 6-6 6z" />
+          </svg>
         </div>
+        <h3 class="text-white text-2xl font-bold mb-3">Ready to Analyze Audio?</h3>
+        <p class="text-[#a5b6a0] text-base max-w-md mx-auto">
+          Start by <strong>recording your voice</strong> or <strong>uploading an audio file</strong>
+          in the section above to begin pitch detection and unlock the analysis results.
+        </p>
       </section>
 
-      <section>
-        <div class="flex flex-col sm:flex-row gap-3">
-          <button @click="downloadMidi" :disabled="!hasData || isProcessing"
-            class="w-full sm:w-auto min-w-[140px] h-11 px-6 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm transition-all duration-200 flex items-center justify-center gap-2">
-            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path
-                d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 1.343-3 3s1.343 3 3 3 3-1.343 3-3V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 1.343-3 3s1.343 3 3 3 3-1.343 3-3V3z" />
-            </svg>
-            Export MIDI
-          </button>
-          <button @click="downloadData" :disabled="!hasData"
-            class="w-full sm:w-auto min-w-[140px] h-11 px-6 rounded-lg bg-[#2d372a] hover:bg-[#3d473a] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm transition-all duration-200">
-            Export JSON
-          </button>
-        </div>
-      </section>
     </div>
   </main>
 </template>
 
 <style>
+/* Import the default theme for @vueform/slider */
 @import '@vueform/slider/themes/default.css';
 
+/* Custom slider styling */
 .slider-custom {
   --slider-connect-bg: white;
-  --slider-tooltip-bg: #53d22c;
+  --slider-bg: #2d372a;
+  --slider-tooltip-bg: white;
   --slider-handle-ring-color: transparent;
   --slider-handle-bg: white;
-  --slider-bg: #42513e;
-  --slider-height: 4px;
-  --slider-handle-width: 16px;
-  --slider-handle-height: 16px;
-  --slider-handle-shadow: none;
-  --slider-handle-shadow-active: none;
+  --slider-height: 10px;
+  --slider-handle-width: 20px;
+  --slider-handle-height: 20px;
+  --slider-handle-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  --slider-handle-shadow-active: 0 4px 8px rgba(0, 0, 0, 0.3);
+  --slider-track-radius: 5px;
+  --slider-handle-radius: 50%;
+  --slider-handle-transition: all 0.2s ease-in-out;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
+/* Range input styling */
+.slider-thumb {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+.slider-thumb::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  background: white;
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease-in-out;
+  cursor: pointer;
+}
+
+.slider-thumb::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.slider-thumb::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  background: white;
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  border: 0;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.slider-thumb::-moz-range-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Statistics styling */
+.stat-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-label {
+  color: #a5b6a0;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 0.125rem;
+}
+
+.stat-value {
+  color: white;
+  font-size: 1rem;
+  font-weight: bold;
+}
+
+/* Export button styling */
+.export-btn {
+  width: 100%;
+  height: 3rem;
+  padding: 0 1.5rem;
+  border-radius: 0.75rem;
+  background-color: #2d372a;
+  color: white;
+  font-weight: bold;
+  font-size: 1rem;
+  transition: all 0.2s ease-in-out;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: none;
+  cursor: pointer;
+}
+
+.export-btn:hover:not(:disabled) {
+  background-color: #3d473a;
+}
+
+.export-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Chart styling */
 .pitch-chart {
   height: 100% !important;
 }
 
-/* Custom scrollbar for better visual consistency */
+/* Fade in animation */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+/* Add a pulse effect to the loading state background */
+@keyframes pulse-fade {
+  0% {
+    background-color: #2d372a;
+  }
+
+  50% {
+    background-color: #384236;
+  }
+
+  /* Slightly lighter green-gray */
+  100% {
+    background-color: #2d372a;
+  }
+}
+
+.animate-pulse-fade {
+  animation: pulse-fade 2s infinite ease-in-out;
+}
+
+/* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
 }
@@ -1159,5 +1516,12 @@ watch([frequencyRange, threshold], () => {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #52614e;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .stat-item {
+    text-align: center;
+  }
 }
 </style>
