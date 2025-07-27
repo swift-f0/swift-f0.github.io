@@ -1063,9 +1063,9 @@ watch(noteSegments, (newSegments) => {
       </header>
 
       <section v-if="isLoadingModel"
-        class="mb-10 bg-[#1a1f17] rounded-xl p-8 border border-[#2d372a] shadow-xl flex flex-col items-center justify-center h-[200px] sm:h-[220px] text-white/70 animate-pulse-fade"
+        class="mb-10 bg-[#1a1f17] rounded-xl p-8 border border-[#2d372a] shadow-xl flex flex-col items-center justify-center min-h-[290px] sm:min-h-[220px] text-white/70 animate-pulse-fade"
         aria-live="polite" aria-atomic="true">
-        <div class="w-16 h-16 border-4 border-[#2d372a] border-t-white rounded-full animate-spin mb-4" role="status"
+        <div class="w-16 h-16 border-4 border-white/25 border-t-white rounded-full animate-spin mb-4" role="status"
           aria-label="Loading"></div>
         <span class="font-bold text-2xl mb-2">
           <template v-if="!showExtendedLoadingMessage">
@@ -1330,9 +1330,8 @@ watch(noteSegments, (newSegments) => {
         class="bg-[#1a1f17] rounded-xl p-10 border border-[#2d372a] shadow-xl text-center min-h-[300px] flex flex-col items-center justify-center"
         aria-live="polite">
         <div class="w-20 h-20 mx-auto mb-6 rounded-full bg-[#2d372a] flex items-center justify-center">
-          <svg class="w-10 h-10 text-[#a5b6a0]" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-            aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l6 6-6 6z" />
+          <svg class="w-10 h-10 text-[#a5b6a0]" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M10 20h4V4h-4v16zm-6 0h4v-8H4v8zM16 9v11h4V9h-4z" />
           </svg>
         </div>
         <h3 class="text-white text-2xl font-bold mb-3">Ready to Analyze Audio?</h3>
