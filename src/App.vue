@@ -1061,17 +1061,16 @@ watch(noteSegments, (newSegments) => {
             Source Code
           </a>
 
-          <!-- Disabled arXiv Button -->
-          <button
-            disabled
-            class="inline-flex items-center gap-2 px-4 py-2 bg-[#1a1f17] border border-[#2d372a] rounded-lg text-white/40 cursor-not-allowed shadow-md"
-            title="Forthcoming: arXiv paper not yet available">
-            <svg class="w-5 h-5 opacity-50" fill="currentColor" viewBox="0 0 24 24">
+          <!-- arXiv Link -->
+          <a href="http://arxiv.org/abs/2508.18440" target="_blank" rel="noopener noreferrer"
+            class="inline-flex items-center gap-2 px-4 py-2 bg-[#1a1f17] border border-[#2d372a] rounded-lg text-white/70 hover:text-white hover:border-[#53d22c] transition-all duration-200 group shadow-md"
+            title="Read the SwiftF0 paper on arXiv (opens in new tab)">
+            <svg class="w-5 h-5 group-hover:scale-110 transition-transform duration-200" fill="currentColor" viewBox="0 0 24 24">
               <path
                 d="M19 3H5c-1.1 0-2 .9-2 2v14a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V5a2 2 0 0 0-2-2zm-7 14H8v-2h4v2zm4-4H8v-2h8v2zm0-4H8V7h8v2z" />
             </svg>
-            arXiv (forthcoming)
-          </button>
+            arXiv Paper
+          </a>
         </div>
       </header>
 
