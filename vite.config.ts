@@ -1,35 +1,36 @@
 import { fileURLToPath, URL } from 'node:url'
 
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
-import { viteStaticCopy } from 'vite-plugin-static-copy'
+
+function preloadAssets(): Plugin {
+  return {
+    name: 'preload-assets',
+    enforce: 'post',
+    generateBundle(_options, bundle) {
+      const links: string[] = []
+      for (const file of Object.keys(bundle)) {
+        const href = `/${file}`
+        if (/onnx-worker.*\.js$/.test(file)) links.push(`<link rel="modulepreload" href="${href}">`)
+        else if (/ort-wasm.*\.mjs$/.test(file)) links.push(`<link rel="modulepreload" href="${href}">`)
+        else if (file.endsWith('.wasm') || file.endsWith('.onnx')) links.push(`<link rel="preload" href="${href}" as="fetch" crossorigin>`)
+        else if (file.endsWith('.woff2')) links.push(`<link rel="preload" href="${href}" as="font" type="font/woff2" crossorigin>`)
+      }
+      const html = bundle['index.html']
+      if (html && html.type === 'asset' && typeof html.source === 'string') {
+        html.source = html.source.replace('</head>', `    ${links.join('\n    ')}\n  </head>`)
+      }
+    },
+  }
+}
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     vue(),
-    viteStaticCopy({
-      targets: [
-        {
-          src: 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.wasm',
-          dest: '',
-        },
-        {
-          src: 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.mjs',
-          dest: '',
-        },
-        {
-          src: 'node_modules/onnxruntime-web/dist/ort.min.js',
-          dest: '',
-        },
-        {
-          src: 'node_modules/onnxruntime-web/dist/ort.min.js.map',
-          dest: '',
-        },
-      ],
-    }),
     tailwindcss(),
+    preloadAssets(),
   ],
   resolve: {
     alias: {
