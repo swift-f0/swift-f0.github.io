@@ -1,12 +1,11 @@
+import { FRAME_PERIOD, SAMPLE_RATE } from './ONNXService'
+
 export interface Note {
   start: number
   end: number
   pitch_median: number
   pitch_midi: number
 }
-
-const SAMPLE_RATE = 16000
-const FRAME_PERIOD = 256 / SAMPLE_RATE
 
 function roundHalfEven(x: number) {
   const f = Math.floor(x)
@@ -20,17 +19,6 @@ function median(values: number[]) {
   const s = [...values].sort((a, b) => a - b)
   const m = s.length >> 1
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2
-}
-
-function framePeriod(t: Float64Array) {
-  if (t.length < 2) return FRAME_PERIOD
-  const diffs: number[] = []
-  for (let i = 1; i < t.length; i++) diffs.push(t[i] - t[i - 1])
-  const fp = median(diffs)
-  if (fp <= 0 || diffs.some((d) => Math.abs(d - fp) > 1e-9 + 1e-7 * fp)) {
-    throw new Error('timestamps must be strictly increasing and uniformly spaced')
-  }
-  return fp
 }
 
 function runs(indices: number[]) {
@@ -63,7 +51,7 @@ function medianRuns(midi: Float64Array, width: number) {
   return out
 }
 
-function riseGates(audio: Float32Array, t: Float64Array, fp: number) {
+function riseGates(audio: Float32Array, t: Float64Array) {
   const n = t.length
   let w = Math.max(2, roundHalfEven(0.064 * SAMPLE_RATE))
   if (w % 2) w += 1
@@ -77,7 +65,7 @@ function riseGates(audio: Float32Array, t: Float64Array, fp: number) {
     const start = Math.min(Math.max(roundHalfEven(t[i] * SAMPLE_RATE), 0), power.length - w)
     rms[i] = Math.sqrt(Math.max(0, (sums[start + w] - sums[start]) / w))
   }
-  const lag = Math.max(1, roundHalfEven(0.032 / fp))
+  const lag = Math.max(1, roundHalfEven(0.032 / FRAME_PERIOD))
   const rising = new Uint8Array(n)
   for (let i = lag; i < n; i++) rising[i] = rms[i - lag] <= 0.6 * rms[i] && rms[i] > 1e-12 ? 1 : 0
   const gates = new Uint8Array(n)
@@ -140,13 +128,12 @@ export function segmentNotes(
   if (n === 0) return []
   const t = new Float64Array(n)
   for (let i = 0; i < n; i++) t[i] = i * FRAME_PERIOD
-  const fp = framePeriod(t)
-  const medianWidth = 2 * roundHalfEven(0.032 / fp) + 1
-  const startGuard = Math.max(1, roundHalfEven(0.032 / fp))
-  const endGuard = Math.max(1, roundHalfEven(0.016 / fp))
-  const maxGap = Math.floor(0.08 / fp + 1e-9)
-  const minFrames = Math.max(1, Math.ceil(minNoteDuration / fp - 1e-9))
-  const penalty = (lam * 0.016 ** 2) / fp
+  const medianWidth = 2 * roundHalfEven(0.032 / FRAME_PERIOD) + 1
+  const startGuard = Math.max(1, roundHalfEven(0.032 / FRAME_PERIOD))
+  const endGuard = Math.max(1, roundHalfEven(0.016 / FRAME_PERIOD))
+  const maxGap = Math.floor(0.08 / FRAME_PERIOD + 1e-9)
+  const minFrames = Math.max(1, Math.ceil(minNoteDuration / FRAME_PERIOD - 1e-9))
+  const penalty = lam * FRAME_PERIOD
 
   const voiced = new Uint8Array(n)
   let on = false
@@ -159,7 +146,7 @@ export function segmentNotes(
   for (let i = 0; i < n; i++) if (voiced[i]) midi[i] = 69 + 12 * Math.log2(pitch[i] / 440)
   midi = medianRuns(midi, medianWidth)
 
-  const gates = riseGates(audio, t, fp)
+  const gates = riseGates(audio, t)
 
   const intervals: [number, number][] = []
   const voicedIdx: number[] = []
@@ -184,13 +171,9 @@ export function segmentNotes(
       const [left, end] = merged[merged.length - 1]
       const p1 = finiteMedian(midi, left, end)
       const p2 = finiteMedian(midi, a, b)
-      let contradicts = false
-      for (let i = end; i < a; i++) {
-        if (Number.isFinite(midi[i]) && Math.abs(midi[i] - p1) >= 0.5) contradicts = true
-      }
       let isProtected = false
       for (let i = Math.max(left + 1, end - 1); i < Math.min(n, a + 2); i++) if (gates[i]) isProtected = true
-      if (a - end <= maxGap && Math.abs(p1 - p2) < 0.5 && !contradicts && !isProtected) {
+      if (a - end <= maxGap && Math.abs(p1 - p2) < 0.5 && !isProtected) {
         merged[merged.length - 1] = [left, b]
         continue
       }
@@ -206,7 +189,7 @@ export function segmentNotes(
     const midiMedian = median(x)
     notes.push({
       start: t[a],
-      end: t[b - 1] + fp,
+      end: t[b - 1] + FRAME_PERIOD,
       pitch_median: 440 * 2 ** ((midiMedian - 69) / 12),
       pitch_midi: roundHalfEven(midiMedian),
     })

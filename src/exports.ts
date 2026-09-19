@@ -40,15 +40,17 @@ export const createMidiFile = (noteSegments: Note[], { tempo = 120, velocity = 8
 
   const secondsToTicks = (seconds: number): number => Math.round(seconds * TICKS_PER_QUARTER_NOTE * (tempo / 60));
 
-  const allEvents: any[] = [];
+  // Absolute ticks; a note off sorts before a note on at the same tick so repeated and
+  // overlapping notes keep their lengths, and every note lasts at least one tick.
+  const allEvents: { ticks: number; type: number; note: number; velocity: number }[] = [];
   for (const note of noteSegments) {
     const midiNote = Math.max(0, Math.min(127, note.pitch_midi));
-    // Note On event
-    allEvents.push({ time: note.start, type: 0x90, note: midiNote, velocity: Math.min(127, velocity) });
-    // Note Off event (velocity 0 for standard MIDI practice)
-    allEvents.push({ time: note.end, type: 0x80, note: midiNote, velocity: 0x00 });
+    const startTicks = secondsToTicks(note.start);
+    const endTicks = Math.max(startTicks + 1, secondsToTicks(note.end));
+    allEvents.push({ ticks: startTicks, type: 0x90, note: midiNote, velocity: Math.min(127, velocity) });
+    allEvents.push({ ticks: endTicks, type: 0x80, note: midiNote, velocity: 0x00 });
   }
-  allEvents.sort((a, b) => secondsToTicks(a.time) - secondsToTicks(b.time) || a.type - b.type); // Crucial for correct delta times and event order
+  allEvents.sort((a, b) => a.ticks - b.ticks || a.type - b.type);
 
   const trackEvents: number[] = [];
   let lastEventTicks = 0;
@@ -62,7 +64,7 @@ export const createMidiFile = (noteSegments: Note[], { tempo = 120, velocity = 8
   );
 
   for (const event of allEvents) {
-    const eventTicks = secondsToTicks(event.time);
+    const eventTicks = event.ticks;
     const deltaTicks = eventTicks - lastEventTicks;
 
     trackEvents.push(...encodeVariableLength(deltaTicks));

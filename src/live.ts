@@ -7,23 +7,35 @@ export interface Capture {
   take(start: number, end: number): Float32Array
 }
 
+// Band-limited resampling for a browser that refuses a 16 kHz audio context: every output sample
+// is a windowed-sinc interpolation of the input, low-passed at the output Nyquist so that content
+// above it cannot alias into the pitch range. The kernel spans 16 zero crossings each side.
 function resampler(from: number, to: number) {
   const ratio = from / to
+  const cutoff = Math.min(0.5, 0.5 / ratio)
+  const halfTaps = Math.ceil(8 / cutoff)
+  let carry = new Float32Array(0)
   let phase = 0
-  let last = 0
   return (chunk: Float32Array) => {
+    const x = new Float32Array(carry.length + chunk.length)
+    x.set(carry)
+    x.set(chunk, carry.length)
     const out: number[] = []
-    let i = phase
-    while (i < chunk.length) {
-      const k = Math.floor(i)
-      const frac = i - k
-      const a = k === 0 ? last : chunk[k - 1]
-      const b = chunk[k]
-      out.push(a + (b - a) * frac)
-      i += ratio
+    let p = phase
+    while (p + halfTaps < x.length) {
+      let acc = 0
+      const k1 = Math.floor(p + halfTaps)
+      for (let k = Math.max(0, Math.ceil(p - halfTaps)); k <= k1; k++) {
+        const d = k - p
+        const sinc = d === 0 ? 1 : Math.sin(2 * Math.PI * cutoff * d) / (2 * Math.PI * cutoff * d)
+        acc += x[k] * sinc * (1 + Math.cos((Math.PI * d) / halfTaps))
+      }
+      out.push(acc * cutoff)
+      p += ratio
     }
-    phase = i - chunk.length
-    last = chunk[chunk.length - 1]
+    const keepFrom = Math.max(0, Math.ceil(p - halfTaps))
+    carry = x.slice(keepFrom)
+    phase = p - keepFrom
     return Float32Array.from(out)
   }
 }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, shallowRef, triggerRef, watch } from 'vue'
-import { ONNXService, FRAME_PERIOD, SAMPLE_RATE } from '@/ONNXService'
+import { ONNXService, WorkerLostError, FRAME_PERIOD, SAMPLE_RATE } from '@/ONNXService'
 import { segmentNotes, type Note } from '@/notes'
 import { fitRange, medianPitch, midi, noteName, plotHeight, readout, renderPlot, tiles, voicedPitches, type Frames, type PlotHandle, type Range, type View } from '@/plot'
 import { createPlayer, type Source } from '@/play'
@@ -67,7 +67,8 @@ const player = createPlayer(
 const MAX_AUDIO_DURATION_SECONDS = 300
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
 const LIVE_WINDOW_SECONDS = 6
-const LIVE_CONTEXT_FRAMES = 12
+const LIVE_LOOKAHEAD_FRAMES = 10
+const LIVE_LEFT_FRAMES = 11
 const LIVE_SPAN_FRAMES = 125
 const LIVE_INTERVAL_MS = 100
 const LIVE_NOTES_FRAMES = 500
@@ -329,11 +330,11 @@ async function liveStep() {
   const session = liveSession
   const totalSamples = Math.floor(capture.seconds() * SAMPLE_RATE)
   const available = Math.floor(totalSamples / 256)
-  const finalEnd = available - LIVE_CONTEXT_FRAMES
+  const finalEnd = available - LIVE_LOOKAHEAD_FRAMES
   const shown = frames.value.pitch.length
   if (finalEnd <= shown) return
   // Include every unseen frame, with left context, even after capture outruns inference.
-  const firstFrame = Math.max(0, Math.min(available - LIVE_SPAN_FRAMES, shown - LIVE_CONTEXT_FRAMES))
+  const firstFrame = Math.max(0, Math.min(available - LIVE_SPAN_FRAMES, shown - LIVE_LEFT_FRAMES))
   liveBusy = true
   try {
     const result = await onnxService.live(capture.take(firstFrame * 256, available * 256))
@@ -590,7 +591,7 @@ async function loadModel() {
 }
 
 function workerLost(err: unknown) {
-  return err instanceof Error && /Worker (is not initialized|error|terminated)|Model loading timed out/.test(err.message)
+  return err instanceof WorkerLostError
 }
 
 onMounted(() => {
@@ -625,13 +626,13 @@ onUnmounted(() => {
           SwiftF0
         </h1>
         <p class="text-white/80 text-lg sm:text-xl leading-relaxed max-w-4xl mx-auto lg:mx-0 mb-6">
-          Pitch from any monophonic recording, in the browser. Read it in hertz, semitones or notes;
-          export it for Praat or as MIDI.
+          Pitch from any monophonic recording, in the browser. Read it in hertz, semitones or notes.
+          Export it for Praat or as MIDI.
         </p>
         <nav class="links">
           <a href="https://github.com/lars76/swift-f0" target="_blank" rel="noopener noreferrer">Source code</a>
           <a href="https://github.com/lars76/pitch-benchmark" target="_blank" rel="noopener noreferrer">Benchmark</a>
-          <a href="http://arxiv.org/abs/2508.18440" target="_blank" rel="noopener noreferrer">arXiv paper</a>
+          <a href="https://arxiv.org/abs/2508.18440" target="_blank" rel="noopener noreferrer">arXiv paper</a>
         </nav>
       </header>
 

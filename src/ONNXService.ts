@@ -15,6 +15,9 @@ export const MODEL_VERSION = '0.2.0'
 
 const LOAD_TIMEOUT_MS = 180_000
 
+// Raised for every request once the worker is gone, so the app can tell a dead worker from a failed request.
+export class WorkerLostError extends Error {}
+
 export class ONNXService {
   private worker: Worker | null = null
   private loaded = false
@@ -27,7 +30,7 @@ export class ONNXService {
 
   async load(): Promise<void> {
     if (this.ready) return
-    this.fail(new Error('Reloading'))
+    this.fail(new WorkerLostError('Reloading'))
     const worker = new Worker(new URL('./onnx-worker.js', import.meta.url), { type: 'module' })
     worker.onmessage = (e: MessageEvent) => {
       const { id, ok, error, ...data } = e.data
@@ -38,10 +41,10 @@ export class ONNXService {
       else request.reject(new Error(error))
     }
     worker.onerror = (e: ErrorEvent) => {
-      this.fail(new Error(e.message || 'Worker error'))
+      this.fail(new WorkerLostError(e.message || 'Worker error'))
     }
     this.worker = worker
-    const timer = setTimeout(() => this.fail(new Error('Model loading timed out')), LOAD_TIMEOUT_MS)
+    const timer = setTimeout(() => this.fail(new WorkerLostError('Model loading timed out')), LOAD_TIMEOUT_MS)
     try {
       await this.request({ type: 'load' })
       this.loaded = true
@@ -65,11 +68,11 @@ export class ONNXService {
   }
 
   terminate() {
-    this.fail(new Error('Worker terminated'))
+    this.fail(new WorkerLostError('Worker terminated'))
   }
 
   private request(message: object, transfer: Transferable[] = []): Promise<any> {
-    if (!this.worker) return Promise.reject(new Error('Worker is not initialized'))
+    if (!this.worker) return Promise.reject(new WorkerLostError('Worker is not initialized'))
     const id = this.nextId++
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject })
@@ -77,7 +80,7 @@ export class ONNXService {
     })
   }
 
-  private fail(error: Error) {
+  private fail(error: WorkerLostError) {
     this.loaded = false
     if (this.worker) {
       this.worker.terminate()
