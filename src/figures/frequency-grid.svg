@@ -1,0 +1,159 @@
+<svg style="background:#1a1f17" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 976 286" width="976" height="286" role="img" aria-label="MIDI numbers, SwiftF0 steps and STFT bins" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" color="#e6edf3">
+<g transform="translate(12, 12)">
+<rect x="800" y="110" width="150" height="150" rx="4" fill="#3fb5a8" fill-opacity="0.06" stroke="#3fb5a8" stroke-opacity="0.8" stroke-width="1.2" stroke-dasharray="4 3"/>
+<text fill="#3fb5a8" x="792" y="123" text-anchor="end" font-size="12" font-weight="600">zoom below</text>
+<text fill="currentColor" x="200" y="14" font-size="14.5" font-weight="600">Three grids between 100 and 400 Hz</text>
+<text fill="currentColor" x="186" y="54" text-anchor="end" font-size="14.5" font-weight="600" fill-opacity="0.7">MIDI numbers m</text>
+<text fill="currentColor" x="186" y="71" text-anchor="end" font-size="14.5" fill-opacity="0.55">f<tspan dy="3" font-size="11.5">m</tspan><tspan dy="-3"> = 440 · 2^((m − 69) / 12) Hz</tspan></text>
+<path d="M200 56 H932" stroke="currentColor" stroke-opacity="0.35" stroke-width="1.5" fill="none"/>
+<path d="M209.3 48 V64" stroke="currentColor" stroke-width="1.5"/>
+<text fill="currentColor" x="209.3" y="79" text-anchor="middle" font-size="14.5" fill-opacity="0.8">G♯2</text>
+<text fill="currentColor" x="209.3" y="93" text-anchor="middle" font-size="14.5" fill-opacity="0.5">103.8</text>
+<path d="M224.4 48 V64" stroke="currentColor" stroke-width="1.5"/>
+<path d="M240.4 48 V64" stroke="currentColor" stroke-width="1.5"/>
+<path d="M257.3 48 V64" stroke="currentColor" stroke-width="1.5"/>
+<path d="M275.2 48 V64" stroke="currentColor" stroke-width="1.5"/>
+<text fill="currentColor" x="275.2" y="79" text-anchor="middle" font-size="14.5" fill-opacity="0.8">C3</text>
+<text fill="currentColor" x="275.2" y="93" text-anchor="middle" font-size="14.5" fill-opacity="0.5">130.8</text>
+<path d="M294.2 48 V64" stroke="currentColor" stroke-width="1.5"/>
+<path d="M314.3 48 V64" stroke="currentColor" stroke-width="1.5"/>
+<path d="M335.6 48 V64" stroke="currentColor" stroke-width="1.5"/>
+<path d="M358.1 48 V64" stroke="currentColor" stroke-width="1.5"/>
+<text fill="currentColor" x="358.1" y="79" text-anchor="middle" font-size="14.5" fill-opacity="0.8">E3</text>
+<text fill="currentColor" x="358.1" y="93" text-anchor="middle" font-size="14.5" fill-opacity="0.5">164.8</text>
+<path d="M382.1 48 V64" stroke="currentColor" stroke-width="1.5"/>
+<path d="M407.4 48 V64" stroke="currentColor" stroke-width="1.5"/>
+<text fill="currentColor" x="407.4" y="79" text-anchor="middle" font-size="14.5" fill-opacity="0.8">F♯3</text>
+<text fill="currentColor" x="407.4" y="93" text-anchor="middle" font-size="14.5" fill-opacity="0.5">185.0</text>
+<path d="M434.2 48 V64" stroke="currentColor" stroke-width="1.5"/>
+<path d="M462.7 48 V64" stroke="currentColor" stroke-width="1.5"/>
+<text fill="currentColor" x="462.7" y="79" text-anchor="middle" font-size="14.5" fill-opacity="0.8">G♯3</text>
+<text fill="currentColor" x="462.7" y="93" text-anchor="middle" font-size="14.5" fill-opacity="0.5">207.7</text>
+<path d="M492.8 48 V64" stroke="currentColor" stroke-width="1.5"/>
+<path d="M524.7 48 V64" stroke="currentColor" stroke-width="1.5"/>
+<text fill="currentColor" x="524.7" y="79" text-anchor="middle" font-size="14.5" fill-opacity="0.8">A♯3</text>
+<text fill="currentColor" x="524.7" y="93" text-anchor="middle" font-size="14.5" fill-opacity="0.5">233.1</text>
+<path d="M558.5 48 V64" stroke="currentColor" stroke-width="1.5"/>
+<path d="M594.4 48 V64" stroke="currentColor" stroke-width="1.5"/>
+<text fill="currentColor" x="594.4" y="79" text-anchor="middle" font-size="14.5" fill-opacity="0.8">C4</text>
+<text fill="currentColor" x="594.4" y="93" text-anchor="middle" font-size="14.5" fill-opacity="0.5">261.6</text>
+<path d="M632.3 48 V64" stroke="currentColor" stroke-width="1.5"/>
+<path d="M672.5 48 V64" stroke="currentColor" stroke-width="1.5"/>
+<text fill="currentColor" x="672.5" y="79" text-anchor="middle" font-size="14.5" fill-opacity="0.8">D4</text>
+<text fill="currentColor" x="672.5" y="93" text-anchor="middle" font-size="14.5" fill-opacity="0.5">293.7</text>
+<path d="M715.1 48 V64" stroke="currentColor" stroke-width="1.5"/>
+<path d="M760.3 48 V64" stroke="currentColor" stroke-width="1.5"/>
+<text fill="currentColor" x="760.3" y="79" text-anchor="middle" font-size="14.5" fill-opacity="0.8">E4</text>
+<text fill="currentColor" x="760.3" y="93" text-anchor="middle" font-size="14.5" fill-opacity="0.5">329.6</text>
+<path d="M808.1 48 V64" stroke="currentColor" stroke-width="1.5"/>
+<path d="M858.8 48 V64" stroke="currentColor" stroke-width="1.5"/>
+<text fill="currentColor" x="858.8" y="79" text-anchor="middle" font-size="14.5" fill-opacity="0.8">F♯4</text>
+<text fill="currentColor" x="858.8" y="93" text-anchor="middle" font-size="14.5" fill-opacity="0.5">370.0</text>
+<path d="M912.5 48 V64" stroke="currentColor" stroke-width="1.5"/>
+<text fill="#3fb5a8" x="186" y="134" text-anchor="end" font-size="14.5" font-weight="600">SwiftF0 steps r</text>
+<text fill="currentColor" x="186" y="151" text-anchor="end" font-size="14.5" fill-opacity="0.55">f<tspan dy="3" font-size="11.5">r</tspan><tspan dy="-3"> = 46.875 · 2^(r / B) Hz</tspan></text>
+<path d="M200 136 H932" stroke="currentColor" stroke-opacity="0.35" stroke-width="1.5" fill="none"/>
+<path d="M202.5 128 V144" stroke="#3fb5a8" stroke-width="1.5"/>
+<text fill="currentColor" x="202.5" y="159" text-anchor="middle" font-size="14.5" fill-opacity="0.8">r = 19</text>
+<text fill="currentColor" x="202.5" y="173" text-anchor="middle" font-size="14.5" fill-opacity="0.5">101.0</text>
+<path d="M212.7 128 V144" stroke="#3fb5a8" stroke-width="1.5"/>
+<path d="M223.3 128 V144" stroke="#3fb5a8" stroke-width="1.5"/>
+<path d="M234.3 128 V144" stroke="#3fb5a8" stroke-width="1.5"/>
+<path d="M245.8 128 V144" stroke="#3fb5a8" stroke-width="1.5"/>
+<path d="M257.7 128 V144" stroke="#3fb5a8" stroke-width="1.5"/>
+<path d="M270.2 128 V144" stroke="#3fb5a8" stroke-width="1.5"/>
+<path d="M283.1 128 V144" stroke="#3fb5a8" stroke-width="1.5"/>
+<path d="M296.6 128 V144" stroke="#3fb5a8" stroke-width="1.5"/>
+<text fill="currentColor" x="296.6" y="159" text-anchor="middle" font-size="14.5" fill-opacity="0.8">r = 27</text>
+<text fill="currentColor" x="296.6" y="173" text-anchor="middle" font-size="14.5" fill-opacity="0.5">139.6</text>
+<path d="M310.7 128 V144" stroke="#3fb5a8" stroke-width="1.5"/>
+<path d="M325.3 128 V144" stroke="#3fb5a8" stroke-width="1.5"/>
+<path d="M340.5 128 V144" stroke="#3fb5a8" stroke-width="1.5"/>
+<path d="M356.4 128 V144" stroke="#3fb5a8" stroke-width="1.5"/>
+<text fill="currentColor" x="356.4" y="159" text-anchor="middle" font-size="14.5" fill-opacity="0.8">r = 31</text>
+<text fill="currentColor" x="356.4" y="173" text-anchor="middle" font-size="14.5" fill-opacity="0.5">164.1</text>
+<path d="M372.9 128 V144" stroke="#3fb5a8" stroke-width="1.5"/>
+<path d="M390.1 128 V144" stroke="#3fb5a8" stroke-width="1.5"/>
+<path d="M408.0 128 V144" stroke="#3fb5a8" stroke-width="1.5"/>
+<path d="M426.6 128 V144" stroke="#3fb5a8" stroke-width="1.5"/>
+<text fill="currentColor" x="426.6" y="159" text-anchor="middle" font-size="14.5" fill-opacity="0.8">r = 35</text>
+<text fill="currentColor" x="426.6" y="173" text-anchor="middle" font-size="14.5" fill-opacity="0.5">192.9</text>
+<path d="M446.0 128 V144" stroke="#3fb5a8" stroke-width="1.5"/>
+<path d="M466.3 128 V144" stroke="#3fb5a8" stroke-width="1.5"/>
+<path d="M487.3 128 V144" stroke="#3fb5a8" stroke-width="1.5"/>
+<path d="M509.2 128 V144" stroke="#3fb5a8" stroke-width="1.5"/>
+<text fill="currentColor" x="509.2" y="159" text-anchor="middle" font-size="14.5" fill-opacity="0.8">r = 39</text>
+<text fill="currentColor" x="509.2" y="173" text-anchor="middle" font-size="14.5" fill-opacity="0.5">226.7</text>
+<path d="M532.0 128 V144" stroke="#3fb5a8" stroke-width="1.5"/>
+<path d="M555.8 128 V144" stroke="#3fb5a8" stroke-width="1.5"/>
+<path d="M580.5 128 V144" stroke="#3fb5a8" stroke-width="1.5"/>
+<path d="M606.3 128 V144" stroke="#3fb5a8" stroke-width="1.5"/>
+<text fill="currentColor" x="606.3" y="159" text-anchor="middle" font-size="14.5" fill-opacity="0.8">r = 43</text>
+<text fill="currentColor" x="606.3" y="173" text-anchor="middle" font-size="14.5" fill-opacity="0.5">266.5</text>
+<path d="M633.1 128 V144" stroke="#3fb5a8" stroke-width="1.5"/>
+<path d="M661.0 128 V144" stroke="#3fb5a8" stroke-width="1.5"/>
+<path d="M690.1 128 V144" stroke="#3fb5a8" stroke-width="1.5"/>
+<path d="M720.4 128 V144" stroke="#3fb5a8" stroke-width="1.5"/>
+<text fill="currentColor" x="720.4" y="159" text-anchor="middle" font-size="14.5" fill-opacity="0.8">r = 47</text>
+<text fill="currentColor" x="720.4" y="173" text-anchor="middle" font-size="14.5" fill-opacity="0.5">313.3</text>
+<path d="M751.9 128 V144" stroke="#3fb5a8" stroke-width="1.5"/>
+<path d="M784.8 128 V144" stroke="#3fb5a8" stroke-width="1.5"/>
+<path d="M818.9 128 V144" stroke="#3fb5a8" stroke-width="1.5"/>
+<path d="M854.5 128 V144" stroke="#3fb5a8" stroke-width="1.5"/>
+<text fill="currentColor" x="854.5" y="159" text-anchor="middle" font-size="14.5" fill-opacity="0.8">r = 51</text>
+<text fill="currentColor" x="854.5" y="173" text-anchor="middle" font-size="14.5" fill-opacity="0.5">368.3</text>
+<path d="M891.6 128 V144" stroke="#3fb5a8" stroke-width="1.5"/>
+<path d="M930.2 128 V144" stroke="#3fb5a8" stroke-width="1.5"/>
+<text fill="currentColor" x="186" y="214" text-anchor="end" font-size="14.5" font-weight="600" fill-opacity="0.7">STFT bins b</text>
+<text fill="currentColor" x="186" y="231" text-anchor="end" font-size="14.5" fill-opacity="0.55">f<tspan dy="3" font-size="11.5">b</tspan><tspan dy="-3"> = b · 15.625 Hz</tspan></text>
+<path d="M200 216 H932" stroke="currentColor" stroke-opacity="0.35" stroke-width="1.5" fill="none"/>
+<path d="M222.9 208 V224" stroke="currentColor" stroke-width="1.5"/>
+<text fill="currentColor" x="222.9" y="239" text-anchor="middle" font-size="14.5" fill-opacity="0.8">b = 7</text>
+<text fill="currentColor" x="222.9" y="253" text-anchor="middle" font-size="14.5" fill-opacity="0.5">109.375</text>
+<path d="M261.0 208 V224" stroke="currentColor" stroke-width="1.5"/>
+<path d="M299.1 208 V224" stroke="currentColor" stroke-width="1.5"/>
+<text fill="currentColor" x="299.1" y="239" text-anchor="middle" font-size="14.5" fill-opacity="0.8">b = 9</text>
+<text fill="currentColor" x="299.1" y="253" text-anchor="middle" font-size="14.5" fill-opacity="0.5">140.625</text>
+<path d="M337.2 208 V224" stroke="currentColor" stroke-width="1.5"/>
+<path d="M375.4 208 V224" stroke="currentColor" stroke-width="1.5"/>
+<text fill="currentColor" x="375.4" y="239" text-anchor="middle" font-size="14.5" fill-opacity="0.8">b = 11</text>
+<text fill="currentColor" x="375.4" y="253" text-anchor="middle" font-size="14.5" fill-opacity="0.5">171.875</text>
+<path d="M413.5 208 V224" stroke="currentColor" stroke-width="1.5"/>
+<path d="M451.6 208 V224" stroke="currentColor" stroke-width="1.5"/>
+<text fill="currentColor" x="451.6" y="239" text-anchor="middle" font-size="14.5" fill-opacity="0.8">b = 13</text>
+<text fill="currentColor" x="451.6" y="253" text-anchor="middle" font-size="14.5" fill-opacity="0.5">203.125</text>
+<path d="M489.8 208 V224" stroke="currentColor" stroke-width="1.5"/>
+<path d="M527.9 208 V224" stroke="currentColor" stroke-width="1.5"/>
+<text fill="currentColor" x="527.9" y="239" text-anchor="middle" font-size="14.5" fill-opacity="0.8">b = 15</text>
+<text fill="currentColor" x="527.9" y="253" text-anchor="middle" font-size="14.5" fill-opacity="0.5">234.375</text>
+<path d="M566.0 208 V224" stroke="currentColor" stroke-width="1.5"/>
+<path d="M604.1 208 V224" stroke="currentColor" stroke-width="1.5"/>
+<text fill="currentColor" x="604.1" y="239" text-anchor="middle" font-size="14.5" fill-opacity="0.8">b = 17</text>
+<text fill="currentColor" x="604.1" y="253" text-anchor="middle" font-size="14.5" fill-opacity="0.5">265.625</text>
+<path d="M642.2 208 V224" stroke="currentColor" stroke-width="1.5"/>
+<path d="M680.4 208 V224" stroke="currentColor" stroke-width="1.5"/>
+<text fill="currentColor" x="680.4" y="239" text-anchor="middle" font-size="14.5" fill-opacity="0.8">b = 19</text>
+<text fill="currentColor" x="680.4" y="253" text-anchor="middle" font-size="14.5" fill-opacity="0.5">296.875</text>
+<path d="M718.5 208 V224" stroke="currentColor" stroke-width="1.5"/>
+<path d="M756.6 208 V224" stroke="currentColor" stroke-width="1.5"/>
+<text fill="currentColor" x="756.6" y="239" text-anchor="middle" font-size="14.5" fill-opacity="0.8">b = 21</text>
+<text fill="currentColor" x="756.6" y="253" text-anchor="middle" font-size="14.5" fill-opacity="0.5">328.125</text>
+<path d="M794.8 208 V224" stroke="currentColor" stroke-width="1.5"/>
+<path d="M832.9 208 V224" stroke="currentColor" stroke-width="1.5"/>
+<text fill="currentColor" x="832.9" y="239" text-anchor="middle" font-size="14.5" fill-opacity="0.8">b = 23</text>
+<text fill="currentColor" x="832.9" y="253" text-anchor="middle" font-size="14.5" fill-opacity="0.5">359.375</text>
+<path d="M871.0 208 V224" stroke="currentColor" stroke-width="1.5"/>
+<path d="M909.1 208 V224" stroke="currentColor" stroke-width="1.5"/>
+<text fill="currentColor" x="909.1" y="239" text-anchor="middle" font-size="14.5" fill-opacity="0.8">b = 25</text>
+<text fill="currentColor" x="909.1" y="253" text-anchor="middle" font-size="14.5" fill-opacity="0.5">390.625</text>
+<path d="M891.6 126 V146" stroke="#3fb5a8" stroke-width="2.5"/>
+<text fill="#3fb5a8" x="891.6" y="123" text-anchor="middle" font-size="12" font-weight="600">52</text>
+<text fill="#3fb5a8" x="854.5" y="123" text-anchor="middle" font-size="12" font-weight="600">51</text>
+<text fill="#3fb5a8" x="930.2" y="123" text-anchor="middle" font-size="12" font-weight="600">53</text>
+<text fill="#3fb5a8" x="832.9" y="203" text-anchor="middle" font-size="12" font-weight="600">23</text>
+<path d="M871.0 206 V226" stroke="#3fb5a8" stroke-width="2.5"/>
+<path d="M909.1 206 V226" stroke="#3fb5a8" stroke-width="2.5"/>
+<text fill="#3fb5a8" x="871.0" y="203" text-anchor="middle" font-size="12" font-weight="600">24</text>
+<text fill="#3fb5a8" x="909.1" y="203" text-anchor="middle" font-size="12" font-weight="600">25</text>
+</g>
+</svg>

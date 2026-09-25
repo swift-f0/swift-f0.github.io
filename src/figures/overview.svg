@@ -1,0 +1,52 @@
+<svg style="background:#1a1f17" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 404" width="880" height="404" role="img" aria-label="The five stages of SwiftF0" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" color="#e6edf3">
+<defs><marker id="arrow-overview" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z" fill="currentColor" fill-opacity="0.55"/></marker></defs>
+<g transform="translate(12, 12)">
+<rect x="0" y="0" width="100" height="64" rx="7" fill="none" stroke="currentColor" stroke-opacity="0.5" stroke-width="1.5"/>
+<text fill="currentColor" x="50" y="27" text-anchor="middle" font-size="16" font-weight="600">Audio</text>
+<text fill="currentColor" x="50" y="47" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">16 kHz mono</text>
+<path d="M100 32 H127" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-overview)"/>
+<rect x="130" y="0" width="170" height="64" rx="7" fill="#3fb5a8" fill-opacity="0.14" stroke="#3fb5a8" stroke-width="1.5"/>
+<text fill="currentColor" x="215" y="27" text-anchor="middle" font-size="16" font-weight="600">Features</text>
+<text fill="currentColor" x="215" y="47" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">STFT + resampling</text>
+<path d="M300 32 H387" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-overview)"/>
+<text fill="currentColor" x="344" y="24" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace">[3, 128, T]</text>
+<rect x="390" y="0" width="250" height="64" rx="7" fill="#6ea8ff" fill-opacity="0.14" stroke="#6ea8ff" stroke-width="1.5"/>
+<text fill="currentColor" x="515" y="27" text-anchor="middle" font-size="16" font-weight="600">Harmonic encoder</text>
+<text fill="currentColor" x="515" y="47" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">stem · 6 blocks · projection</text>
+<path d="M420 64 V104 H365" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5"/>
+<circle cx="365" cy="104" r="2.5" fill="currentColor" fill-opacity="0.55"/>
+<text fill="currentColor" x="428" y="92" text-anchor="start" font-size="13" font-weight="400" fill-opacity="0.7" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace">[4, 95, T]</text>
+<path d="M365 104 V162 H387" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-overview)"/>
+<path d="M365 162 V274 H387" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-overview)"/>
+<text fill="currentColor" x="590" y="104" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace">fmin, fmax</text>
+<path d="M590 110 V127" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-overview)"/>
+<rect x="390" y="130" width="250" height="64" rx="7" fill="#c58ae0" fill-opacity="0.14" stroke="#c58ae0" stroke-width="1.5"/>
+<text fill="currentColor" x="515" y="157" text-anchor="middle" font-size="16" font-weight="600">Pitch head</text>
+<text fill="currentColor" x="515" y="177" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">scores · decoding</text>
+<path d="M515 194 V237" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arrow-overview)"/>
+<text fill="currentColor" x="523" y="220" text-anchor="start" font-size="13" font-weight="400" fill-opacity="0.7" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace">0 outside band</text>
+<rect x="390" y="240" width="250" height="64" rx="7" fill="#e0a030" fill-opacity="0.14" stroke="#e0a030" stroke-width="1.5"/>
+<text fill="currentColor" x="515" y="267" text-anchor="middle" font-size="16" font-weight="600">Confidence head</text>
+<text fill="currentColor" x="515" y="287" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">features · temporal</text>
+<path d="M215 64 V290 H387" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-overview)"/>
+<text fill="currentColor" x="223" y="200" text-anchor="start" font-size="13" font-weight="400" fill-opacity="0.7" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace">input level</text>
+<text fill="currentColor" x="223" y="218" text-anchor="start" font-size="13" font-weight="400" fill-opacity="0.7" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace">[1, T]</text>
+<path d="M640 162 H677" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-overview)"/>
+<text fill="currentColor" x="658" y="154" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace">[T]</text>
+<path d="M640 272 H677" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-overview)"/>
+<text fill="currentColor" x="658" y="264" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace">[T]</text>
+<rect x="680" y="130" width="160" height="64" rx="7" fill="none" stroke="currentColor" stroke-opacity="0.5" stroke-width="1.5"/>
+<text fill="currentColor" x="760" y="157" text-anchor="middle" font-size="16" font-weight="600">Pitch (Hz)</text>
+<text fill="currentColor" x="760" y="177" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">46.875 to 2093.75</text>
+<rect x="680" y="240" width="160" height="64" rx="7" fill="none" stroke="currentColor" stroke-opacity="0.5" stroke-width="1.5"/>
+<text fill="currentColor" x="760" y="267" text-anchor="middle" font-size="16" font-weight="600">Confidence</text>
+<text fill="currentColor" x="760" y="287" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">sigmoid · voiced ≥ 0.5</text>
+<path d="M840 162 H852 V352 H843" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-overview)"/>
+<path d="M760 304 V317" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-overview)"/>
+<rect x="680" y="320" width="160" height="64" rx="7" fill="#53d22c" fill-opacity="0.14" stroke="#53d22c" stroke-width="1.5"/>
+<text fill="currentColor" x="760" y="347" text-anchor="middle" font-size="16" font-weight="600">Notes</text>
+<text fill="currentColor" x="760" y="367" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">optional</text>
+<path d="M50 64 V352 H677" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-overview)"/>
+<text fill="currentColor" x="364" y="344" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace">loudness</text>
+</g>
+</svg>

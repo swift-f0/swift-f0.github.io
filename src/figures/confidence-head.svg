@@ -1,0 +1,37 @@
+<svg style="background:#1a1f17" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 288" width="880" height="288" role="img" aria-label="How the confidence head estimates reliability" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" color="#e6edf3">
+<defs><marker id="arrow-confidence-head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z" fill="currentColor" fill-opacity="0.55"/></marker></defs>
+<g transform="translate(12, 12)">
+<rect x="0" y="0" width="186" height="80" rx="7" fill="#e0a030" fill-opacity="0.14" stroke="#e0a030" stroke-width="1.5"/>
+<text fill="currentColor" x="93" y="25" text-anchor="middle" font-size="16" font-weight="600">Confidence features</text>
+<text fill="currentColor" x="93" y="45" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">convolution</text>
+<text fill="currentColor" x="93" y="65" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">kernel 5 × 1</text>
+<path d="M186 40 H273" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-confidence-head)"/>
+<text fill="currentColor" x="230" y="32" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace">[4, 95, T]</text>
+<rect x="276" y="0" width="186" height="80" rx="7" fill="#e0a030" fill-opacity="0.14" stroke="#e0a030" stroke-width="1.5"/>
+<text fill="currentColor" x="369" y="35" text-anchor="middle" font-size="16" font-weight="600">Max over frequency</text>
+<text fill="currentColor" x="369" y="55" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">95 rows → 1</text>
+<path d="M462 40 H507" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-confidence-head)"/>
+<text fill="currentColor" x="485" y="32" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace">[4, T]</text>
+<rect x="510" y="15" width="90" height="50" rx="7" fill="#e0a030" fill-opacity="0.14" stroke="#e0a030" stroke-width="1.5"/>
+<text fill="currentColor" x="555" y="45" text-anchor="middle" font-size="16" font-weight="600">Concat</text>
+<path d="M600 40 H669" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-confidence-head)"/>
+<text fill="currentColor" x="634" y="32" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace">[5, T]</text>
+<rect x="672" y="0" width="184" height="80" rx="7" fill="#e0a030" fill-opacity="0.14" stroke="#e0a030" stroke-width="1.5"/>
+<text fill="currentColor" x="764" y="25" text-anchor="middle" font-size="16" font-weight="600">Temporal context</text>
+<text fill="currentColor" x="764" y="45" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">convolution</text>
+<text fill="currentColor" x="764" y="65" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">kernel 1 × 3</text>
+<rect x="0" y="150" width="210" height="64" rx="7" fill="#e0a030" fill-opacity="0.14" stroke="#e0a030" stroke-width="1.5"/>
+<text fill="currentColor" x="105" y="177" text-anchor="middle" font-size="16" font-weight="600">Input level</text>
+<text fill="currentColor" x="105" y="197" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">mean of the log spectrogram</text>
+<path d="M210 182 H555 V68" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-confidence-head)"/>
+<text fill="currentColor" x="382" y="174" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace">[1, T]</text>
+<path d="M764 80 V137" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-confidence-head)"/>
+<text fill="currentColor" x="772" y="114" text-anchor="start" font-size="13" font-weight="400" fill-opacity="0.7" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace">[16, T]</text>
+<rect x="672" y="140" width="184" height="80" rx="7" fill="#e0a030" fill-opacity="0.14" stroke="#e0a030" stroke-width="1.5"/>
+<text fill="currentColor" x="764" y="165" text-anchor="middle" font-size="16" font-weight="600">Confidence logit</text>
+<text fill="currentColor" x="764" y="185" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">convolution</text>
+<text fill="currentColor" x="764" y="205" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">kernel 1 × 1</text>
+<path d="M764 220 V261" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-confidence-head)"/>
+<text fill="currentColor" x="772" y="248" text-anchor="start" font-size="13" font-weight="400" fill-opacity="0.7" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace">[T]</text>
+</g>
+</svg>

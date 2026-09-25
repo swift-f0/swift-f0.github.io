@@ -1,0 +1,65 @@
+<svg style="background:#1a1f17" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 324" width="880" height="324" role="img" aria-label="Harmonic encoder layers and their dilation" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" color="#e6edf3">
+<defs><marker id="arrow-encoder-layers" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z" fill="currentColor" fill-opacity="0.55"/></marker></defs>
+<g transform="translate(12, 12)">
+<path d="M0 80 H87" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-encoder-layers)"/>
+<text fill="currentColor" x="0" y="104" text-anchor="start" font-size="13" font-weight="400" fill-opacity="0.7" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace">[3, 128, T]</text>
+<rect x="90" y="32" width="165" height="96" rx="7" fill="#6ea8ff" fill-opacity="0.14" stroke="#6ea8ff" stroke-width="1.5"/>
+<text fill="currentColor" x="172.5" y="65" text-anchor="middle" font-size="16" font-weight="600">Stem</text>
+<text fill="currentColor" x="172.5" y="85" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">kernel 3 × 3</text>
+<text fill="currentColor" x="172.5" y="105" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">3 → 12 channels</text>
+<path d="M255 80 H282" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-encoder-layers)"/>
+<rect x="285" y="32" width="165" height="96" rx="7" fill="#6ea8ff" fill-opacity="0.14" stroke="#6ea8ff" stroke-width="1.5"/>
+<text fill="currentColor" x="367.5" y="65" text-anchor="middle" font-size="16" font-weight="600">Local block</text>
+<text fill="currentColor" x="367.5" y="85" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">kernel 7 × 3</text>
+<text fill="currentColor" x="367.5" y="105" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">dilation 1</text>
+<path d="M301 32 V18 H434 V29" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-encoder-layers)"/>
+<text fill="currentColor" x="367.5" y="13" text-anchor="middle" font-size="16" font-weight="400" fill-opacity="0.7">+</text>
+<path d="M450 80 H477" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-encoder-layers)"/>
+<rect x="480" y="32" width="165" height="96" rx="7" fill="#6ea8ff" fill-opacity="0.14" stroke="#6ea8ff" stroke-width="1.5"/>
+<text fill="currentColor" x="562.5" y="55" text-anchor="middle" font-size="16" font-weight="600">Harmonic block</text>
+<text fill="currentColor" x="562.5" y="75" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">harmonic 2</text>
+<text fill="currentColor" x="562.5" y="95" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">kernel 7 × 1</text>
+<text fill="currentColor" x="562.5" y="115" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">dilation 17</text>
+<path d="M496 32 V18 H629 V29" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-encoder-layers)"/>
+<text fill="currentColor" x="562.5" y="13" text-anchor="middle" font-size="16" font-weight="400" fill-opacity="0.7">+</text>
+<path d="M645 80 H672" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-encoder-layers)"/>
+<rect x="675" y="32" width="165" height="96" rx="7" fill="#6ea8ff" fill-opacity="0.14" stroke="#6ea8ff" stroke-width="1.5"/>
+<text fill="currentColor" x="757.5" y="55" text-anchor="middle" font-size="16" font-weight="600">Harmonic block</text>
+<text fill="currentColor" x="757.5" y="75" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">harmonic 3</text>
+<text fill="currentColor" x="757.5" y="95" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">kernel 5 × 1</text>
+<text fill="currentColor" x="757.5" y="115" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">dilation 27</text>
+<path d="M691 32 V18 H824 V29" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-encoder-layers)"/>
+<text fill="currentColor" x="757.5" y="13" text-anchor="middle" font-size="16" font-weight="400" fill-opacity="0.7">+</text>
+<path d="M757.5 128 V173" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-encoder-layers)"/>
+<rect x="675" y="176" width="165" height="96" rx="7" fill="#6ea8ff" fill-opacity="0.14" stroke="#6ea8ff" stroke-width="1.5"/>
+<text fill="currentColor" x="757.5" y="199" text-anchor="middle" font-size="16" font-weight="600">Harmonic block</text>
+<text fill="currentColor" x="757.5" y="219" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">harmonic 5</text>
+<text fill="currentColor" x="757.5" y="239" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">kernel 3 × 1</text>
+<text fill="currentColor" x="757.5" y="259" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">dilation 40</text>
+<path d="M824 272 V286 H691 V275" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-encoder-layers)"/>
+<text fill="currentColor" x="757.5" y="305" text-anchor="middle" font-size="16" font-weight="400" fill-opacity="0.7">+</text>
+<path d="M675 224 H648" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-encoder-layers)"/>
+<rect x="480" y="176" width="165" height="96" rx="7" fill="#6ea8ff" fill-opacity="0.14" stroke="#6ea8ff" stroke-width="1.5"/>
+<text fill="currentColor" x="562.5" y="199" text-anchor="middle" font-size="16" font-weight="600">Harmonic block</text>
+<text fill="currentColor" x="562.5" y="219" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">harmonic 7</text>
+<text fill="currentColor" x="562.5" y="239" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">kernel 3 × 1</text>
+<text fill="currentColor" x="562.5" y="259" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">dilation 48</text>
+<path d="M629 272 V286 H496 V275" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-encoder-layers)"/>
+<text fill="currentColor" x="562.5" y="305" text-anchor="middle" font-size="16" font-weight="400" fill-opacity="0.7">+</text>
+<path d="M480 224 H453" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-encoder-layers)"/>
+<rect x="285" y="176" width="165" height="96" rx="7" fill="#6ea8ff" fill-opacity="0.14" stroke="#6ea8ff" stroke-width="1.5"/>
+<text fill="currentColor" x="367.5" y="209" text-anchor="middle" font-size="16" font-weight="600">Local block</text>
+<text fill="currentColor" x="367.5" y="229" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">kernel 7 × 3</text>
+<text fill="currentColor" x="367.5" y="249" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">dilation 2</text>
+<path d="M434 272 V286 H301 V275" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-encoder-layers)"/>
+<text fill="currentColor" x="367.5" y="305" text-anchor="middle" font-size="16" font-weight="400" fill-opacity="0.7">+</text>
+<path d="M285 224 H258" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-encoder-layers)"/>
+<rect x="90" y="176" width="165" height="96" rx="7" fill="#6ea8ff" fill-opacity="0.14" stroke="#6ea8ff" stroke-width="1.5"/>
+<text fill="currentColor" x="172.5" y="199" text-anchor="middle" font-size="16" font-weight="600">Projection</text>
+<text fill="currentColor" x="172.5" y="219" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">kernel 3 × 3</text>
+<text fill="currentColor" x="172.5" y="239" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">12 → 4 channels</text>
+<text fill="currentColor" x="172.5" y="259" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">keep 95 steps</text>
+<path d="M90 224 H2" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-encoder-layers)"/>
+<text fill="currentColor" x="0" y="248" text-anchor="start" font-size="13" font-weight="400" fill-opacity="0.7" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace">[4, 95, T]</text>
+</g>
+</svg>

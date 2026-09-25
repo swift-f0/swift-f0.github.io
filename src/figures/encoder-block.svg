@@ -1,0 +1,31 @@
+<svg style="background:#1a1f17" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 918 152" width="918" height="152" role="img" aria-label="A harmonic encoder block" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" color="#e6edf3">
+<defs><marker id="arrow-opt_b_block" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z" fill="currentColor" fill-opacity="0.55"/></marker></defs>
+<g transform="translate(12, 12)">
+<path d="M2 80 H75" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-opt_b_block)"/>
+<rect x="78" y="37" width="132" height="86" rx="7" fill="#6ea8ff" fill-opacity="0.14" stroke="#6ea8ff" stroke-width="1.5"/>
+<text fill="currentColor" x="144" y="65" text-anchor="middle" font-size="15" font-weight="600">convolution</text>
+<text fill="currentColor" x="144" y="85" text-anchor="middle" font-size="13.5" font-weight="400" fill-opacity="0.7">kernel rows × 1</text>
+<text fill="currentColor" x="144" y="105" text-anchor="middle" font-size="13.5" font-weight="400" fill-opacity="0.7">dilation d</text>
+<path d="M210 80 H233" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-opt_b_block)"/>
+<rect x="236" y="57" width="104" height="46" rx="7" fill="#6ea8ff" fill-opacity="0.14" stroke="#6ea8ff" stroke-width="1.5"/>
+<text fill="currentColor" x="288" y="85" text-anchor="middle" font-size="15" font-weight="600">BatchNorm</text>
+<path d="M340 80 H363" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-opt_b_block)"/>
+<rect x="366" y="57" width="70" height="46" rx="7" fill="#6ea8ff" fill-opacity="0.14" stroke="#6ea8ff" stroke-width="1.5"/>
+<text fill="currentColor" x="401" y="85" text-anchor="middle" font-size="15" font-weight="600">ReLU</text>
+<path d="M436 80 H459" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-opt_b_block)"/>
+<rect x="462" y="37" width="132" height="86" rx="7" fill="#6ea8ff" fill-opacity="0.14" stroke="#6ea8ff" stroke-width="1.5"/>
+<text fill="currentColor" x="528" y="65" text-anchor="middle" font-size="15" font-weight="600">convolution</text>
+<text fill="currentColor" x="528" y="85" text-anchor="middle" font-size="13.5" font-weight="400" fill-opacity="0.7">kernel rows × 1</text>
+<text fill="currentColor" x="528" y="105" text-anchor="middle" font-size="13.5" font-weight="400" fill-opacity="0.7">dilation d</text>
+<path d="M594 80 H617" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-opt_b_block)"/>
+<rect x="620" y="57" width="104" height="46" rx="7" fill="#6ea8ff" fill-opacity="0.14" stroke="#6ea8ff" stroke-width="1.5"/>
+<text fill="currentColor" x="672" y="85" text-anchor="middle" font-size="15" font-weight="600">BatchNorm</text>
+<path d="M724 80 H777" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-opt_b_block)"/>
+<rect x="780" y="57" width="70" height="46" rx="7" fill="#6ea8ff" fill-opacity="0.14" stroke="#6ea8ff" stroke-width="1.5"/>
+<text fill="currentColor" x="815" y="85" text-anchor="middle" font-size="15" font-weight="600">ReLU</text>
+<path d="M850 80 H887" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-opt_b_block)"/>
+<path d="M34 80 V12 H752 V76" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-opt_b_block)"/>
+<circle cx="34" cy="80" r="2.5" fill="currentColor" fill-opacity="0.55"/>
+<text fill="currentColor" x="393" y="6" text-anchor="middle" font-size="13.5" font-weight="400" fill-opacity="0.7">+</text>
+</g>
+</svg>

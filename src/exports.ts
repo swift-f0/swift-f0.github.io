@@ -1,6 +1,6 @@
 import type { Note } from './notes'
 import type { Frames } from './plot'
-import { FMAX, FMIN, FRAME_PERIOD, MODEL_VERSION, SAMPLE_RATE } from './ONNXService'
+import { FRAME_PERIOD, MODEL_VERSION, SAMPLE_RATE } from './ONNXService'
 
 export const createMidiFile = (noteSegments: Note[], { tempo = 120, velocity = 80 } = {}): Uint8Array<ArrayBuffer> => {
   const HEADER_CHUNK_TYPE = [0x4d, 0x54, 0x68, 0x64];
@@ -44,7 +44,7 @@ export const createMidiFile = (noteSegments: Note[], { tempo = 120, velocity = 8
   // overlapping notes keep their lengths, and every note lasts at least one tick.
   const allEvents: { ticks: number; type: number; note: number; velocity: number }[] = [];
   for (const note of noteSegments) {
-    const midiNote = Math.max(0, Math.min(127, note.pitch_midi));
+    const midiNote = Math.max(0, Math.min(127, Math.round(69 + 12 * Math.log2(note.pitch_hz / 440))));
     const startTicks = secondsToTicks(note.start);
     const endTicks = Math.max(startTicks + 1, secondsToTicks(note.end));
     allEvents.push({ ticks: startTicks, type: 0x90, note: midiNote, velocity: Math.min(127, velocity) });
@@ -96,13 +96,14 @@ export const createMidiFile = (noteSegments: Note[], { tempo = 120, velocity = 8
   ]);
 };
 
-export function exportJson(frames: Frames, notes: Note[], source: string | null) {
+export function exportJson(frames: Frames, notes: Note[], source: string | null, pitchHoldMs: number, fmin: number, fmax: number) {
   const rows = []
   for (let i = 0; i < frames.pitch.length; i++) {
     rows.push({
       timestamp: parseFloat((i * FRAME_PERIOD).toFixed(4)),
       pitch_hz: parseFloat(frames.pitch[i].toFixed(2)),
       confidence: parseFloat(frames.conf[i].toFixed(4)),
+      loudness_db: parseFloat(frames.loud[i].toFixed(2)),
       is_voiced: frames.conf[i] >= 0.5 && frames.pitch[i] > 0,
     })
   }
@@ -114,16 +115,15 @@ export function exportJson(frames: Frames, notes: Note[], source: string | null)
     frame_period: FRAME_PERIOD,
     settings: {
       voiced_threshold: 0.5,
-      fmin: FMIN,
-      fmax: FMAX,
-      segmentation: { lam: 250, min_note_duration: 0.05, detect_repeated_notes: true },
+      fmin,
+      fmax,
+      segmentation: { pitch_hold_ms: pitchHoldMs },
     },
     frames: rows,
     notes: notes.map((n) => ({
       start: parseFloat(n.start.toFixed(4)),
       end: parseFloat(n.end.toFixed(4)),
-      pitch_median: parseFloat(n.pitch_median.toFixed(2)),
-      pitch_midi: n.pitch_midi,
+      pitch_hz: parseFloat(n.pitch_hz.toFixed(2)),
     })),
   }
   return new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })

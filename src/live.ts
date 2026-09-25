@@ -59,8 +59,11 @@ export async function startCapture(onChunk: () => void): Promise<Capture> {
   try {
     try {
       ctx = new AudioContext({ sampleRate: SAMPLE_RATE })
+      source = ctx.createMediaStreamSource(stream)
     } catch {
+      await ctx?.close().catch(() => {})
       ctx = new AudioContext()
+      source = ctx.createMediaStreamSource(stream)
     }
     const convert = ctx.sampleRate === SAMPLE_RATE ? null : resampler(ctx.sampleRate, SAMPLE_RATE)
     let buffer = new Float32Array(SAMPLE_RATE * 30)
@@ -78,7 +81,6 @@ export async function startCapture(onChunk: () => void): Promise<Capture> {
       onChunk()
     }
 
-    source = ctx.createMediaStreamSource(stream)
     let acknowledgeStop: (() => void) | null = null
     if (ctx.audioWorklet) {
       await ctx.audioWorklet.addModule(workletUrl)

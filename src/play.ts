@@ -119,8 +119,9 @@ export function createPlayer(onTick: (t: number) => void, onEnd: () => void) {
     }
     for (const note of source === 'original' ? [] : notes) {
       if (note.end <= from) continue
-      const sample = nearest(note.pitch_midi, loaded)
-      const rate = 2 ** ((note.pitch_midi - sample.midi) / 12)
+      const key = Math.round(69 + 12 * Math.log2(note.pitch_hz / 440))
+      const sample = nearest(key, loaded)
+      const rate = 2 ** ((key - sample.midi) / 12)
       const at = t0 + Math.max(0, note.start - from)
       const offset = Math.max(0, from - note.start) * rate
       const releaseAt = t0 + note.end - from

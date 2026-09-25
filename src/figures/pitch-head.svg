@@ -1,0 +1,48 @@
+<svg style="background:#1a1f17" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 324" width="880" height="324" role="img" aria-label="How the pitch head refines the best candidate" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" color="#e6edf3">
+<defs><marker id="arrow-pitch-head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z" fill="currentColor" fill-opacity="0.55"/></marker></defs>
+<g transform="translate(12, 12)">
+<text fill="currentColor" x="0" y="36" text-anchor="start" font-size="13" font-weight="400" fill-opacity="0.7" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace">[4, 95, T]</text>
+<path d="M0 48 H97" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-pitch-head)"/>
+<rect x="100" y="0" width="150" height="96" rx="7" fill="#c58ae0" fill-opacity="0.14" stroke="#c58ae0" stroke-width="1.5"/>
+<text fill="currentColor" x="175" y="23" text-anchor="middle" font-size="16" font-weight="600">Pitch score</text>
+<text fill="currentColor" x="175" y="43" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">convolution</text>
+<text fill="currentColor" x="175" y="63" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">kernel 1 × 1</text>
+<text fill="currentColor" x="175" y="83" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">4 → 1 channels</text>
+<path d="M250 48 H300" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5"/>
+<circle cx="300" cy="48" r="2.5" fill="currentColor" fill-opacity="0.55"/>
+<text fill="currentColor" x="262" y="40" text-anchor="start" font-size="13" font-weight="400" fill-opacity="0.7" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace">[95, T]</text>
+<path d="M300 48 H347" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-pitch-head)"/>
+<text fill="currentColor" x="350" y="22" text-anchor="start" font-size="13" font-weight="600">training</text>
+<rect x="350" y="30" width="160" height="64" rx="7" fill="#c58ae0" fill-opacity="0.14" stroke="#c58ae0" stroke-width="1.5"/>
+<text fill="currentColor" x="430" y="57" text-anchor="middle" font-size="16" font-weight="600">Softmax</text>
+<text fill="currentColor" x="430" y="77" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">over the 95 steps</text>
+<path d="M510 62 H547" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-pitch-head)"/>
+<rect x="550" y="30" width="220" height="64" rx="7" fill="#c58ae0" fill-opacity="0.14" stroke="#c58ae0" stroke-width="1.5"/>
+<text fill="currentColor" x="660" y="57" text-anchor="middle" font-size="16" font-weight="600">Cross-entropy</text>
+<text fill="currentColor" x="660" y="77" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">target 1 − α on ℓ, α on ℓ + 1</text>
+<path d="M770 62 H835" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-pitch-head)"/>
+<text fill="currentColor" x="800" y="54" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace">loss</text>
+<path d="M300 48 V140 H80 V177" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-pitch-head)"/>
+<text fill="currentColor" x="0" y="168" text-anchor="start" font-size="13" font-weight="600">inference</text>
+<rect x="0" y="180" width="160" height="80" rx="7" fill="#c58ae0" fill-opacity="0.14" stroke="#c58ae0" stroke-width="1.5"/>
+<text fill="currentColor" x="80" y="205" text-anchor="middle" font-size="16" font-weight="600">Band mask</text>
+<text fill="currentColor" x="80" y="225" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">outside the band</text>
+<text fill="currentColor" x="80" y="245" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">score → −∞</text>
+<path d="M80 296 V263" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-pitch-head)"/>
+<text fill="currentColor" x="90" y="290" text-anchor="start" font-size="13" font-weight="400" fill-opacity="0.7" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace">fmin, fmax</text>
+<path d="M160 220 H197" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-pitch-head)"/>
+<rect x="200" y="188" width="120" height="64" rx="7" fill="#c58ae0" fill-opacity="0.14" stroke="#c58ae0" stroke-width="1.5"/>
+<text fill="currentColor" x="260" y="215" text-anchor="middle" font-size="16" font-weight="600">Argmax</text>
+<text fill="currentColor" x="260" y="235" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">best step r*</text>
+<path d="M320 220 H357" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-pitch-head)"/>
+<rect x="360" y="188" width="180" height="64" rx="7" fill="#c58ae0" fill-opacity="0.14" stroke="#c58ae0" stroke-width="1.5"/>
+<text fill="currentColor" x="450" y="215" text-anchor="middle" font-size="16" font-weight="600">Softmax</text>
+<text fill="currentColor" x="450" y="235" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">over r* − 1, r*, r* + 1</text>
+<path d="M540 220 H577" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-pitch-head)"/>
+<rect x="580" y="188" width="160" height="64" rx="7" fill="#c58ae0" fill-opacity="0.14" stroke="#c58ae0" stroke-width="1.5"/>
+<text fill="currentColor" x="660" y="215" text-anchor="middle" font-size="16" font-weight="600">Weighted mean</text>
+<text fill="currentColor" x="660" y="235" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7">of log f, then exp</text>
+<path d="M740 220 H853" fill="none" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.5" marker-end="url(#arrow-pitch-head)"/>
+<text fill="currentColor" x="796" y="212" text-anchor="middle" font-size="13" font-weight="400" fill-opacity="0.7" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace">pitch [T]</text>
+</g>
+</svg>

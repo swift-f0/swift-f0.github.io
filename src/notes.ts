@@ -1,198 +1,76 @@
-import { FRAME_PERIOD, SAMPLE_RATE } from './ONNXService'
+import { FRAME_PERIOD } from './ONNXService'
 
 export interface Note {
   start: number
   end: number
-  pitch_median: number
-  pitch_midi: number
-}
-
-function roundHalfEven(x: number) {
-  const f = Math.floor(x)
-  const r = x - f
-  if (r < 0.5) return f
-  if (r > 0.5) return f + 1
-  return f % 2 === 0 ? f : f + 1
-}
-
-function median(values: number[]) {
-  const s = [...values].sort((a, b) => a - b)
-  const m = s.length >> 1
-  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2
-}
-
-function runs(indices: number[]) {
-  const out: number[][] = []
-  let current: number[] = []
-  for (const i of indices) {
-    if (current.length && i - current[current.length - 1] > 1) {
-      out.push(current)
-      current = []
-    }
-    current.push(i)
-  }
-  if (current.length) out.push(current)
-  return out
-}
-
-function medianRuns(midi: Float64Array, width: number) {
-  const out = Float64Array.from(midi)
-  const finite: number[] = []
-  for (let i = 0; i < midi.length; i++) if (Number.isFinite(midi[i])) finite.push(i)
-  for (const run of runs(finite)) {
-    if (run.length < 3) continue
-    const k = Math.min(width, run.length | 1)
-    if (k <= 1) continue
-    const half = k >> 1
-    const values = run.map((i) => midi[i])
-    const padded = [...Array(half).fill(values[0]), ...values, ...Array(half).fill(values[values.length - 1])]
-    for (let j = 0; j < run.length; j++) out[run[j]] = median(padded.slice(j, j + k))
-  }
-  return out
-}
-
-function riseGates(audio: Float32Array, t: Float64Array) {
-  const n = t.length
-  let w = Math.max(2, roundHalfEven(0.064 * SAMPLE_RATE))
-  if (w % 2) w += 1
-  const half = w >> 1
-  const power = new Float64Array(audio.length + w)
-  for (let i = 0; i < audio.length; i++) power[half + i] = audio[i] * audio[i]
-  const sums = new Float64Array(power.length + 1)
-  for (let i = 0; i < power.length; i++) sums[i + 1] = sums[i] + power[i]
-  const rms = new Float64Array(n)
-  for (let i = 0; i < n; i++) {
-    const start = Math.min(Math.max(roundHalfEven(t[i] * SAMPLE_RATE), 0), power.length - w)
-    rms[i] = Math.sqrt(Math.max(0, (sums[start + w] - sums[start]) / w))
-  }
-  const lag = Math.max(1, roundHalfEven(0.032 / FRAME_PERIOD))
-  const rising = new Uint8Array(n)
-  for (let i = lag; i < n; i++) rising[i] = rms[i - lag] <= 0.6 * rms[i] && rms[i] > 1e-12 ? 1 : 0
-  const gates = new Uint8Array(n)
-  for (let i = 0; i < n; i++) gates[i] = rising[i] && !(i > 0 && rising[i - 1]) ? 1 : 0
-  return gates
-}
-
-function changepoints(x: Float64Array, penalty: number): [number, number][] {
-  const m = x.length
-  if (m === 0) return []
-  const s1 = new Float64Array(m + 1)
-  const s2 = new Float64Array(m + 1)
-  for (let i = 0; i < m; i++) {
-    const v = x[i] - x[0]
-    s1[i + 1] = s1[i] + v
-    s2[i + 1] = s2[i] + v * v
-  }
-  const cost = new Float64Array(m + 1).fill(Infinity)
-  cost[0] = 0
-  const back = new Int32Array(m + 1)
-  for (let end = 1; end <= m; end++) {
-    let best = Infinity
-    let k = 0
-    for (let start = 0; start < end; start++) {
-      const d = s1[end] - s1[start]
-      const sse = Math.max(0, s2[end] - s2[start] - (d * d) / (end - start))
-      const candidate = cost[start] + sse + penalty
-      if (candidate < best) {
-        best = candidate
-        k = start
-      }
-    }
-    cost[end] = best
-    back[end] = k
-  }
-  const out: [number, number][] = []
-  let end = m
-  while (end) {
-    const start = back[end]
-    out.push([start, end])
-    end = start
-  }
-  return out.reverse()
-}
-
-function finiteMedian(values: Float64Array, a: number, b: number) {
-  const x: number[] = []
-  for (let i = a; i < b; i++) if (Number.isFinite(values[i])) x.push(values[i])
-  return x.length ? median(x) : NaN
+  pitch_hz: number
 }
 
 export function segmentNotes(
-  audio: Float32Array,
   pitch: ArrayLike<number>,
   confidence: ArrayLike<number>,
-  lam = 250,
-  minNoteDuration = 0.05,
+  loudness: ArrayLike<number>,
+  pitchHoldMs = 80,
 ): Note[] {
   const n = pitch.length
-  if (n === 0) return []
-  const t = new Float64Array(n)
-  for (let i = 0; i < n; i++) t[i] = i * FRAME_PERIOD
-  const medianWidth = 2 * roundHalfEven(0.032 / FRAME_PERIOD) + 1
-  const startGuard = Math.max(1, roundHalfEven(0.032 / FRAME_PERIOD))
-  const endGuard = Math.max(1, roundHalfEven(0.016 / FRAME_PERIOD))
-  const maxGap = Math.floor(0.08 / FRAME_PERIOD + 1e-9)
-  const minFrames = Math.max(1, Math.ceil(minNoteDuration / FRAME_PERIOD - 1e-9))
-  const penalty = lam * FRAME_PERIOD
-
-  const voiced = new Uint8Array(n)
-  let on = false
-  for (let i = 0; i < n; i++) {
-    const valid = Number.isFinite(pitch[i]) && pitch[i] > 0 && Number.isFinite(confidence[i])
-    on = valid && confidence[i] >= (on ? 0.3 : 0.5)
-    voiced[i] = on ? 1 : 0
+  const m = new Float64Array(n)
+  const w = new Float64Array(n)
+  const q = new Float64Array(n)
+  const observed: number[] = []
+  for (let t = 0; t < n; t++) {
+    if (Number.isFinite(pitch[t]) && pitch[t] > 0) {
+      m[t] = 69 + 12 * Math.log2(pitch[t] / 440)
+      w[t] = confidence[t]
+      observed.push(Math.floor(m[t] * 100 + 0.5) / 100)
+    }
+    let left = -Infinity
+    let right = -Infinity
+    for (let j = 0; j < 5; j++) {
+      let a = t - j
+      while (a < 0 || a >= n) a = a < 0 ? -a - 1 : 2 * n - a - 1
+      let b = t + j
+      while (b < 0 || b >= n) b = b < 0 ? -b - 1 : 2 * n - b - 1
+      left = Math.max(left, loudness[a])
+      right = Math.max(right, loudness[b])
+    }
+    const cc = Math.min(Math.max(w[t], 0.01), 0.99)
+    q[t] = -Math.log(cc / (1 - cc)) + Math.max(0, Math.min(left, right) - loudness[t] - 10 * Math.log10(2))
   }
-  let midi = new Float64Array(n).fill(NaN)
-  for (let i = 0; i < n; i++) if (voiced[i]) midi[i] = 69 + 12 * Math.log2(pitch[i] / 440)
-  midi = medianRuns(midi, medianWidth)
-
-  const gates = riseGates(audio, t)
-
-  const intervals: [number, number][] = []
-  const voicedIdx: number[] = []
-  for (let i = 0; i < n; i++) if (voiced[i]) voicedIdx.push(i)
-  for (const run of runs(voicedIdx)) {
-    const start = run[0]
-    const end = run[run.length - 1] + 1
-    const bounds = [start]
-    for (let q = start + startGuard; q < end - endGuard; q++) if (gates[q]) bounds.push(q)
-    bounds.push(end)
-    for (let j = 0; j + 1 < bounds.length; j++) {
-      const left = bounds[j]
-      for (const [a, b] of changepoints(midi.subarray(left, bounds[j + 1]), penalty)) {
-        intervals.push([left + a, left + b])
+  const mu = Float64Array.from(new Set(observed)).sort()
+  const u = mu.length
+  if (u === 0) return []
+  const beta = pitchHoldMs / 1000 / FRAME_PERIOD
+  const vn = new Float64Array(u).fill(Infinity)
+  const noteStart = new Int32Array(u)
+  const back = new Int32Array(n + 1)
+  const kind = new Int32Array(n + 1).fill(-1)
+  let best = 0
+  for (let t = 0; t < n; t++) {
+    const start = best + beta
+    let j = 0
+    for (let k = 0; k < u; k++) {
+      if (start < vn[k]) {
+        vn[k] = start
+        noteStart[k] = t
       }
+      vn[k] += w[t] * Math.min(Math.abs(mu[k] - m[t]), 2) + q[t]
+      if (vn[k] < vn[j]) j = k
+    }
+    if (vn[j] < best) {
+      best = vn[j]
+      back[t + 1] = noteStart[j]
+      kind[t + 1] = j
+    } else {
+      back[t + 1] = t
     }
   }
-
-  const merged: [number, number][] = []
-  for (const [a, b] of intervals) {
-    if (merged.length) {
-      const [left, end] = merged[merged.length - 1]
-      const p1 = finiteMedian(midi, left, end)
-      const p2 = finiteMedian(midi, a, b)
-      let isProtected = false
-      for (let i = Math.max(left + 1, end - 1); i < Math.min(n, a + 2); i++) if (gates[i]) isProtected = true
-      if (a - end <= maxGap && Math.abs(p1 - p2) < 0.5 && !isProtected) {
-        merged[merged.length - 1] = [left, b]
-        continue
-      }
-    }
-    merged.push([a, b])
-  }
-
   const notes: Note[] = []
-  for (const [a, b] of merged) {
-    const x: number[] = []
-    for (let i = a; i < b; i++) if (Number.isFinite(midi[i])) x.push(midi[i])
-    if (x.length < minFrames) continue
-    const midiMedian = median(x)
-    notes.push({
-      start: t[a],
-      end: t[b - 1] + FRAME_PERIOD,
-      pitch_median: 440 * 2 ** ((midiMedian - 69) / 12),
-      pitch_midi: roundHalfEven(midiMedian),
-    })
+  for (let b = n; b > 0; ) {
+    const a = back[b]
+    if (kind[b] >= 0) {
+      notes.push({ start: a * FRAME_PERIOD, end: (b - 1) * FRAME_PERIOD + FRAME_PERIOD, pitch_hz: 440 * 2 ** ((mu[kind[b]] - 69) / 12) })
+    }
+    b = a
   }
-  return notes
+  return notes.reverse()
 }
