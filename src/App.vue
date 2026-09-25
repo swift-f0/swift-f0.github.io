@@ -63,8 +63,8 @@ onUnmounted(() => {
       <p class="intro">Pitch and notes of a voice or instrument, in your browser.</p>
       <nav class="links" aria-label="Main navigation">
         <a href="/how/" :aria-current="page === 'how' ? 'page' : undefined" @click="navigate('/how/', $event)">How it works</a>
-        <a href="https://github.com/lars76/swift-f0" target="_blank" rel="noopener noreferrer">Python package</a>
-        <a href="https://github.com/lars76/swift-f0-training" target="_blank" rel="noopener noreferrer">Training code</a>
+        <a href="https://github.com/lars76/swift-f0" target="_blank" rel="noopener noreferrer"><span class="long">Python package</span><span class="short">Package</span></a>
+        <a href="https://github.com/lars76/swift-f0-training" target="_blank" rel="noopener noreferrer"><span class="long">Training code</span><span class="short">Training</span></a>
         <a href="https://github.com/lars76/pitch-benchmark" target="_blank" rel="noopener noreferrer">Benchmark</a>
       </nav>
     </header>
