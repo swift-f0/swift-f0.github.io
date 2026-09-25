@@ -31,7 +31,7 @@
     <p>No single window works for every pitch. A short window cannot separate the harmonics of a low pitch. A long window can, but it cannot tell when the pitch changes inside it. SwiftF0 therefore uses three windows, 32, 64 and 128 ms long. The network learns which one to trust at each frequency.</p>
     <p>Take a window of \(w\) samples, \(w\) = 512, 1024 or 2048. The transform treats the \(w\) samples as one period of a signal that repeats forever. Where one copy ends and the next begins, that signal is discontinuous. A discontinuity spreads energy over all frequencies and hides weaker harmonics. The <em>Hann window</em> \(h[n] = \tfrac{1}{2}\bigl(1 - \cos(2\pi n / w)\bigr)\) removes the discontinuity. It is a bell shape that is 1 in the middle and 0 at both ends. The STFT is then:</p>
     \[ S_w[b, t] = \sum_{n=0}^{w - 1} x[256\,t + n - w/2]\, h[n]\, e^{-2\pi i\, b n / w} \]
-    <p>Here \(x[\cdot]\) is the waveform sampled at 16 kHz, taken as 0 outside the clip, so window \(t\) is centered on sample \(256\,t\). \(t\) is the frame index and \(b\) the frequency bin at \(f_b = b \cdot 16000 / w\) Hz, so neighboring bins are \(16000 / w\) Hz apart. For the three windows, the bins are 31.25, 15.625 and 7.8125 Hz apart. Audio is a real signal, so the bins above \(w / 2\) only mirror the ones below and are dropped. The remaining bins cover 0 Hz to 8 kHz. This upper limit is half the sample rate and is called the <em>Nyquist frequency</em>. For the three windows these are 257, 513 and 1025 bins.</p>
+    <p>Here \(x[\cdot]\) is the waveform sampled at 16 kHz, taken as 0 outside the clip, so window \(t\) is centered on sample \(256\,t\). \(t\) is the frame index and \(b\) the frequency bin at \(f_b = b \cdot 16000 / w\) Hz, so neighboring bins are \(16000 / w\) Hz apart. For the three windows, the bins are 31.25, 15.625 and 7.8125 Hz apart. Audio is a real signal, so the bins above \(w / 2\) only mirror the ones below and are dropped. The remaining bins cover 0 Hz to 8 kHz. This upper limit is half the sample rate and is called the <em>Nyquist frequency</em>. The three windows therefore keep 257, 513 and 1025 bins.</p>
     <h4 id="how-features-grid" tabindex="-1">The log-frequency grid</h4>
     <p>The bins of an STFT are evenly spaced in Hz, but musical notes are not. Going one key higher on a piano multiplies the frequency by \(\sqrt[12]{2} \approx 1.059\). Twelve keys higher is one octave, which doubles the frequency. MIDI numbers the keys, one per semitone. A4 is MIDI number 69 and is tuned to 440 Hz. Every other note follows by multiplying:</p>
     \[ f_{m+1} = \sqrt[12]{2}\, f_m, \qquad f_{m+12} = 2 f_m, \qquad f_m = 440 \cdot 2^{(m - 69)/12} \]
@@ -68,7 +68,7 @@
     <p>The heights sum to 0.99, so scaling them to add up to 1 gives 0.45 and 0.55. Row 52 of the product is therefore</p>
     \[ A_{1024}[52, t] = 0.45\, \bigl|S_{1024}[24, t]\bigr| + 0.55\, \bigl|S_{1024}[25, t]\bigr| \]
     <p>With two bins this is linear interpolation. At higher frequencies the triangle widens. By step 100 it holds thirteen bins of the 1024 window. At low frequencies the triangle can be narrower than the bin spacing and hold no bin at all. Such a step takes the value of the nearest bin.</p>
-    <p>One operation remains. A loud harmonic can be a thousand times stronger than a quiet one, and the network should see both. The logarithm compresses this range. The \(10^{-8}\) keeps it finite where a step holds no energy. With that the features of window \(w\) are complete:</p>
+    <p>One operation remains. A loud harmonic can be a thousand times stronger than a quiet one, and the network should see both. The logarithm compresses this range. A small constant, \(10^{-8}\), keeps it finite where a step holds no energy. With that the features of window \(w\) are complete:</p>
     \[ X_w = \ln\bigl( A_w + 10^{-8} \bigr) \]
     <p>The three windows give three channels, one per window. Stacked, they form the feature map of size \(3 \times 128 \times T\): one channel per window, one row per step and one column per frame, one every 16 ms.</p>
     <h4 id="how-features-code" tabindex="-1">Pseudocode</h4>
@@ -199,7 +199,7 @@ def encoder(X):                                            # X: [3, 128, T]
     \[ L = -(1 - \alpha)\, \ln p_\ell - \alpha\, \ln p_{\ell+1}, \qquad p_r = \frac{e^{z_r}}{\sum_{r'} e^{z_{r'}}} \]
     <p>The loss is smallest when the probabilities at steps \(\ell\) and \(\ell + 1\) are \(1 - \alpha\) and \(\alpha\).</p>
     <h4 id="how-pitch-decode" tabindex="-1">Decoding the pitch</h4>
-    <p>At inference the decoder turns the scores back into a frequency. In the Python package, the parameters <code>fmin</code> and <code>fmax</code> can limit the search to a band from \(f_{\mathrm{lo}}\) to \(f_{\mathrm{hi}}\). Scores outside the band are set to \(-\infty\). The best step is the one with the highest remaining score:</p>
+    <p>At inference the decoder turns the scores back into a frequency. In the Python package, the parameters <code>fmin</code> and <code>fmax</code> can limit the search to a band from \(f_{\mathrm{lo}}\) to \(f_{\mathrm{hi}}\). The Range setting in the demo does the same. Scores outside the band are set to \(-\infty\). The best step is the one with the highest remaining score:</p>
     \[ z'_r = \begin{cases} z_r & f_{\mathrm{lo}} \le f_r \le f_{\mathrm{hi}} \\ -\infty & \text{otherwise} \end{cases}, \qquad r^* = \arg\max_r z'_r \]
     <p>The decoder then takes the best step with its two neighbors. Both neighbors are included because it is not known whether the pitch lies below or above the best step. The wrong side gets a weight near 0. A softmax over the three scores gives three weights. Scores outside the 95 steps count as \(-\infty\). The weighted mean of the three log frequencies is the pitch:</p>
     \[ p'_j = \frac{e^{z'_{r^*+j}}}{\sum_{j'=-1}^{1} e^{z'_{r^*+j'}}}, \qquad \hat f_0 = \exp\Bigl( \sum_{j=-1}^{1} p'_j \ln f_{r^*+j} \Bigr) \]
@@ -225,7 +225,7 @@ def decode(z, fmin, fmax):                                 # inference, one fram
     z = where(inside, z, -inf)                             # band mask
     r = argmax(z)
     p = softmax(pad(z, -inf)[r : r + 3])                   # three weights, -inf past either end
-    lf = log(f[clip([r - 1, r, r + 1], 0, K - 1)])       # clamped at the ends, where the weight is 0
+    lf = log(f[clip([r - 1, r, r + 1], 0, K - 1)])         # clamped at the ends, where the weight is 0
     f0 = exp(sum(p * lf))
     return f0, kept                                        # confidence is set to 0 where not kept</pre>
 
@@ -234,7 +234,7 @@ def decode(z, fmin, fmax):                                 # inference, one fram
     <h3 id="how-confidence" tabindex="-1" style="color:#e0a030">4. Confidence head</h3>
     <p>The pitch head always returns a pitch, even for silence or noise. The confidence head says whether to trust it. Its input is the same \(4 \times 95 \times T\) as the pitch head's.</p>
     <h4 id="how-confidence-meaning" tabindex="-1">What it estimates</h4>
-    <p>A frame is <em>voiced</em> when it contains a pitched sound. Silence, noise and consonants such as s are unvoiced. The confidence \(c_t\) estimates the probability that the frame is voiced and that the reported pitch is correct. <em>Correct</em> means within half a semitone, 50 cents, of the truth. By the chain rule this is the probability of being voiced times the probability of being correct given that the frame is voiced:</p>
+    <p>A frame is <em>voiced</em> when it contains a pitched sound. Silence, noise and consonants such as the s in “sun” are unvoiced. The confidence \(c_t\) estimates the probability that the frame is voiced and that the reported pitch is correct. <em>Correct</em> means within half a semitone, 50 cents, of the truth. By the chain rule this is the probability of being voiced times the probability of being correct given that the frame is voiced:</p>
     \[ \begin{aligned} c_t &\approx \Pr(\mathrm{voiced}_t \wedge \mathrm{correct}_t) \\ &= \Pr(\mathrm{voiced}_t) \cdot \Pr(\mathrm{correct}_t \mid \mathrm{voiced}_t) \end{aligned} \]
     <p>The second factor only concerns voiced frames. For an unvoiced frame the training target is 0. The head is trained towards this probability. After the calibration described below, \(c_t\) is no longer exactly this probability. <a href="#fig-confidence-head"></a> shows how the head computes \(c_t\) from the features.</p>
     <figure class="diagram" id="fig-confidence-head">
@@ -317,7 +317,7 @@ def confidence_loss(c, f0_hat, f0):                        # training, one frame
     <p>SwiftF0 uses \(\beta = 5\) by default. Since \(5 \gt 2.21\), SwiftF0 keeps one note. A split needs \(\beta \lt 2.21\), or a dip about 2.8 dB deeper.</p>
     <h4 id="how-notes-code" tabindex="-1">Pseudocode</h4>
     <p>SwiftF0 finds the minimum of \(J\) by dynamic programming. The best pitch of a note is always one of the measured pitches \(m_t\). SwiftF0 tries each of them.</p>
-    <p>In the Python package, the parameter <code>pitch_hold_ms</code> is \(\beta\) in milliseconds, \(\beta = \) <code>pitch_hold_ms</code> \(/\, \Delta t\). The default of 80 ms gives \(\beta = 5\). A new pitch one semitone away becomes a note of its own once it lasts longer than <code>pitch_hold_ms</code>. Two conditions change this time:</p>
+    <p>In the Python package, the parameter <code>pitch_hold_ms</code> is \(\beta\) in milliseconds, \(\beta = \) <code>pitch_hold_ms</code> \(/\, \Delta t\). The default of 80 ms gives \(\beta = 5\). The Pitch hold setting in the demo sets the same value. A new pitch one semitone away becomes a note of its own once it lasts longer than <code>pitch_hold_ms</code>. Two conditions change this time:</p>
     <ul>
       <li>If the pitch jumps two semitones or more, half the time is enough, 40 ms.</li>
       <li>If the pitch returns to the old note afterwards, it needs twice as long, 160 ms.</li>

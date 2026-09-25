@@ -201,7 +201,8 @@ export function renderPlot(svg: SVGSVGElement, m: PlotModel): PlotHandle {
   s += '</g>'
   const ts = timeStep(x1 - x0, plotW)
   for (let t = Math.ceil(x0 / ts) * ts; t <= x1 + 1e-6; t += ts) {
-    s += `<text x="${x(t).toFixed(1)}" y="${H - 12}" text-anchor="middle" class="tick">${t.toFixed(ts < 1 ? 1 : 0)} s</text>`
+    const edge = x(t) + 20 > W
+    s += `<text x="${(edge ? W - 2 : x(t)).toFixed(1)}" y="${H - 12}" text-anchor="${edge ? 'end' : 'middle'}" class="tick">${t.toFixed(ts < 1 ? 1 : 0)} s</text>`
   }
 
   const { pitch, conf } = frames

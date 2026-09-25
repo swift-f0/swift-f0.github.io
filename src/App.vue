@@ -60,7 +60,7 @@ onUnmounted(() => {
   <div class="wrap">
     <header ref="header" class="site-header">
       <h1><a href="/" :aria-current="page === 'demo' ? 'page' : undefined" @click="navigate('/', $event)">SwiftF0<span v-if="recording" class="recording-badge"> · Recording</span></a></h1>
-      <p class="intro">Pitch from any monophonic recording, in the browser.</p>
+      <p class="intro">Pitch and notes of a voice or instrument, in your browser.</p>
       <nav class="links" aria-label="Main navigation">
         <a href="/how/" :aria-current="page === 'how' ? 'page' : undefined" @click="navigate('/how/', $event)">How it works</a>
         <a href="https://github.com/lars76/swift-f0" target="_blank" rel="noopener noreferrer">Python package</a>

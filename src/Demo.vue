@@ -366,7 +366,7 @@ const facts = computed(() => {
   if (isRecording.value) return { name: 'Recording', rest: `${liveClock.value} · mono` }
   const f = frames.value
   if (!f || !hasData.value || !sourceName.value) return null
-  const level = takePeak.value > 0 ? `peak ${Math.round(20 * Math.log10(takePeak.value))} dBFS` : 'silent'
+  const level = takePeak.value > 0 ? `peak ${String(Math.round(20 * Math.log10(takePeak.value))).replace('-', '\u2212')} dBFS` : 'silent'
   return {
     name: sourceName.value,
     rest: `${truncatedFrom.value ? `first ${mmss(duration.value)} of ${mmss(truncatedFrom.value)}` : `${duration.value.toFixed(2)} s`} · ${sourceChannels.value} · ${level} · ${Math.round((100 * voicedCount.value) / f.pitch.length)} % voiced`,
@@ -381,12 +381,14 @@ const emptyMessage = computed(() => {
     }
   }
   if (voicedCount.value > 0) return null
-  const peakDb = takePeak.value > 0 ? 20 * Math.log10(takePeak.value) : -100
+  const peakDb = 20 * Math.log10(takePeak.value)
   const small =
     duration.value < 0.5
       ? `too short (${duration.value.toFixed(2)} s)`
-      : peakDb < -30
-        ? `very quiet (peak ${peakDb.toFixed(0)} dBFS)`
+      : takePeak.value === 0
+        ? 'silent'
+        : peakDb < -30
+        ? `very quiet (peak ${peakDb.toFixed(0).replace('-', '\u2212')} dBFS)`
         : appliedRange.value[0] > FMIN || appliedRange.value[1] < FMAX
           ? `no periodic signal inside the range ${Math.round(appliedRange.value[0])}\u2013${Math.round(appliedRange.value[1])} Hz, or noise, chords or silence`
           : 'no periodic signal: noise, chords or silence'
@@ -927,11 +929,11 @@ function hover(e: MouseEvent) {
         ['Note', cents(note.pitch_hz)],
         ['Pitch', `${note.pitch_hz.toFixed(1)} Hz`],
         ['Length', `${(note.end - note.start).toFixed(2)} s`],
-        ['Frame', voiced ? `${pitch.toFixed(1)} Hz` : 'unvoiced'],
+        ['Here', voiced ? `${pitch.toFixed(1)} Hz` : 'unvoiced'],
         ['Time', clock(t)],
       ]
     : [
-        ['Frame', voiced ? `${pitch.toFixed(1)} Hz` : 'unvoiced'],
+        ['Here', voiced ? `${pitch.toFixed(1)} Hz` : 'unvoiced'],
         ['Nearest', voiced ? cents(pitch) : '-'],
         ['Time', clock(t)],
         ['Confidence', conf.toFixed(2)],
@@ -1067,7 +1069,7 @@ onUnmounted(() => {
           </div>
           <div ref="rangeBox" class="hold">
             <span class="holdlabel" id="range-label">Range</span>
-            <button ref="rangeButton" class="btn compact holdbtn rangebtn" type="button" :disabled="!hasData || inputsBusy || isRecording" :aria-expanded="rangeOpen" aria-controls="range-sheet" aria-labelledby="range-label rangebtn-value" title="Pitch search band" @click="toggleRange">
+            <button ref="rangeButton" class="btn compact holdbtn rangebtn" type="button" :disabled="inputsBusy || isRecording" :aria-expanded="rangeOpen" aria-controls="range-sheet" aria-labelledby="range-label rangebtn-value" title="Pitch search band" @click="toggleRange">
               <b id="rangebtn-value">{{ rangeText }}</b>
               <svg class="caret" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
@@ -1088,7 +1090,7 @@ onUnmounted(() => {
           </div>
           <div ref="holdBox" class="hold">
             <span class="holdlabel" id="hold-label">Pitch hold</span>
-            <button ref="holdButton" class="btn compact holdbtn" type="button" :disabled="!hasData || isRecording" :aria-expanded="holdOpen" aria-controls="hold-sheet" aria-labelledby="hold-label holdbtn-value" title="How long a new pitch one semitone away must be held before it becomes a note of its own" @click="toggleHold">
+            <button ref="holdButton" class="btn compact holdbtn" type="button" :disabled="isRecording" :aria-expanded="holdOpen" aria-controls="hold-sheet" aria-labelledby="hold-label holdbtn-value" title="How long a new pitch one semitone away must be held before it becomes a note of its own" @click="toggleHold">
               <b id="holdbtn-value">{{ holdText }}</b>
               <svg class="caret" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
@@ -1109,7 +1111,7 @@ onUnmounted(() => {
               </div>
             </div>
           </div>
-          <span class="tdivider bardivider" aria-hidden="true"></span>
+          <span v-if="!isRecording" class="tdivider bardivider" aria-hidden="true"></span>
           <div v-if="!isRecording" class="tb-right">
             <button class="btn compact rec" :class="{ primary: !hasData }" type="button" :disabled="inputsBusy" title="Record from the microphone. The pitch shows while you speak or play." @click="recordAudio">{{ isStarting ? 'Starting…' : 'Record' }}</button>
             <button class="btn compact" type="button" :disabled="inputsBusy" :title="`Upload an audio file, up to ${maxAudioDurationMinutes} minutes`" @click="uploadAudioFile">Upload</button>
@@ -2104,6 +2106,8 @@ button.msg:disabled {
   .sources {
     margin-left: 0;
   }
+  .transport .tdivider { display: none; }
+  .exportbox { margin-left: auto; }
 }
 
 @media (max-width: 700px) {
